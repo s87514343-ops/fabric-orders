@@ -8,13 +8,17 @@
  * ⚠️ הקובץ הזה הוא תבנית. בגיליון האמיתי יש למלא את שני הערכים למטה.
  *    אין להעלות לכאן כתובות מייל אמיתיות — המאגר ציבורי.
  *
- * הגדרות הפריסה הנדרשות (פריסה ← פריסה חדשה ← אפליקציית אינטרנט):
+ * ⚠️ אחרי כל הדבקה של הקוד יש להריץ ידנית את testAuth פעם אחת ולאשר
+ *    את ההרשאות. בלי זה UrlFetchApp נחסם, האימות נכשל, וכל התחברות
+ *    נדחית עם "אין הרשאת גישה לאינטרנט". פריסה בלבד אינה מספיקה.
+ *
+ * הגדרות הפריסה (Deploy ← Manage deployments ← ✏️ ← New version):
  *    Execute as:        Me
  *    Who has access:    Anyone
  * "Anyone" נחוץ כדי שהדפדפן יוכל לפנות לכאן; האבטחה היא בטוקן, לא בהגדרה הזו.
  */
 
-/* המשתמשים המורשים. להוסיף או להסיר — פשוט לערוך את הרשימה ולפרוס מחדש. */
+/* המשתמשים המורשים. להוסיף או להסיר — לערוך ולפרוס גרסה חדשה. */
 var ALLOWED_EMAILS = [
   'REPLACE_WITH_ALLOWED_EMAIL@gmail.com'
 ];
@@ -23,43 +27,70 @@ var ALLOWED_EMAILS = [
 var CLIENT_ID = 'REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com';
 
 
+/* יש להריץ ידנית פעם אחת אחרי כל החלפת קוד — מאשר את ההרשאות */
+function testAuth() {
+  var res = UrlFetchApp.fetch(
+    'https://oauth2.googleapis.com/tokeninfo?id_token=dummy',
+    { muteHttpExceptions: true });
+  Logger.log('גישה לאינטרנט: תקינה (HTTP ' + res.getResponseCode() + ')');
+  Logger.log('CLIENT_ID: ' + CLIENT_ID);
+  Logger.log('מורשים: ' + ALLOWED_EMAILS.join(', '));
+}
+
 function jsonOut(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
 /**
- * מאמת את הטוקן מול גוגל ומחזיר את כתובת המייל, או null אם אינו תקין.
- * בדיקת ה-aud קריטית: בלעדיה אפשר היה להשתמש בטוקן שהונפק לאפליקציה אחרת.
+ * מאמת את הטוקן מול גוגל.
+ * מחזיר { ok: true, email } או { ok: false, reason } עם סיבה קריאה למשתמש.
+ * בדיקת ה-aud קריטית: בלעדיה טוקן שהונפק לאפליקציה אחרת היה מתקבל כתקין.
  */
 function verifyToken(idToken) {
-  if (!idToken) return null;
+  if (!idToken) return { ok: false, reason: 'לא התקבל טוקן' };
 
   var cache = CacheService.getScriptCache();
   var key = 'tok_' + Utilities.base64EncodeWebSafe(
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken));
   var hit = cache.get(key);
-  if (hit) return hit;
+  if (hit) return { ok: true, email: hit };
 
+  var res;
   try {
-    var res = UrlFetchApp.fetch(
+    res = UrlFetchApp.fetch(
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken),
       { muteHttpExceptions: true });
-    if (res.getResponseCode() !== 200) return null;
-
-    var info = JSON.parse(res.getContentText());
-    if (info.aud !== CLIENT_ID) return null;
-    if (String(info.email_verified) !== 'true') return null;
-    if (Number(info.exp) * 1000 < Date.now()) return null;
-
-    var email = String(info.email || '').toLowerCase().trim();
-    if (!email) return null;
-
-    cache.put(key, email, 300);   /* חמש דקות, כדי לא לאמת מחדש בכל שמירה */
-    return email;
   } catch (err) {
-    return null;
+    return { ok: false, reason: 'אין הרשאת גישה לאינטרנט — יש להריץ testAuth' };
   }
+
+  if (res.getResponseCode() !== 200) {
+    return { ok: false, reason: 'גוגל דחתה את הטוקן (HTTP ' + res.getResponseCode() + ')' };
+  }
+
+  var info;
+  try {
+    info = JSON.parse(res.getContentText());
+  } catch (err) {
+    return { ok: false, reason: 'תשובה לא קריאה מגוגל' };
+  }
+
+  if (info.aud !== CLIENT_ID) {
+    return { ok: false, reason: 'המזהה אינו תואם. התקבל: ' + String(info.aud).slice(0, 24) + '…' };
+  }
+  if (String(info.email_verified) !== 'true') {
+    return { ok: false, reason: 'המייל אינו מאומת אצל גוגל' };
+  }
+  if (Number(info.exp) * 1000 < Date.now()) {
+    return { ok: false, reason: 'הטוקן פג תוקף' };
+  }
+
+  var email = String(info.email || '').toLowerCase().trim();
+  if (!email) return { ok: false, reason: 'לא התקבלה כתובת מייל' };
+
+  cache.put(key, email, 300);   /* חמש דקות, כדי לא לאמת מחדש בכל שמירה */
+  return { ok: true, email: email };
 }
 
 function isAllowed(email) {
@@ -77,9 +108,9 @@ function doPost(e) {
     return jsonOut({ ok: false, error: 'bad_request' });
   }
 
-  var email = verifyToken(payload.idToken);
-  if (!email) return jsonOut({ ok: false, error: 'unauthenticated' });
-  if (!isAllowed(email)) return jsonOut({ ok: false, error: 'forbidden', email: email });
+  var v = verifyToken(payload.idToken);
+  if (!v.ok) return jsonOut({ ok: false, error: 'unauthenticated', reason: v.reason });
+  if (!isAllowed(v.email)) return jsonOut({ ok: false, error: 'forbidden', email: v.email });
 
   if (payload.action === 'load') return loadRows();
   if (payload.action === 'save') return saveRows(payload);
