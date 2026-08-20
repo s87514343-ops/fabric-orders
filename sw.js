@@ -2,11 +2,19 @@
    מאפשר התקנה כאפליקציה ועבודה גם בלי אינטרנט.
    שים לב: הקובץ הזה חייב להיות באותה תיקייה כמו קובץ ה-HTML כשמעלים לאחסון. */
 
-const CACHE = 'fabric-orders-v1';
+const CACHE = 'fabric-orders-v2';
 
-/* התקנה — נכנסים לתוקף מיד, בלי לחכות לסגירת הטאבים */
+/* קבצי הליבה — נשמרים מראש כדי שהאפליקציה תיפתח גם בלי אינטרנט */
+const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+
+/* התקנה — שומרים את הליבה ונכנסים לתוקף מיד */
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(CORE))
+      .catch(() => {})   /* קובץ חסר לא ימנע את ההתקנה */
+      .then(() => self.skipWaiting())
+  );
 });
 
 /* הפעלה — מנקים גרסאות ישנות של המטמון */
