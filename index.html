@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     color-scheme: light;
@@ -293,6 +294,51 @@
   }
   .brand-mark svg { width: 28px; height: 28px; display: block; }
 
+  /* ============ login gate ============ */
+  .gate {
+    position: fixed; inset: 0; z-index: 200; display: none;
+    align-items: center; justify-content: center; padding: 22px;
+    background: var(--page);
+  }
+  .gate.open { display: flex; }
+  .gate-card {
+    position: relative; overflow: hidden; text-align: center;
+    width: 100%; max-width: 400px; padding: 34px 28px 30px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.16), 0 6px 20px rgba(0,0,0,0.08);
+    animation: modalIn .35s cubic-bezier(.2,.9,.3,1.15);
+  }
+  [data-theme="dark"] .gate-card { box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 6px 20px rgba(0,0,0,0.4); }
+  .gate-card::before {
+    content: ''; position: absolute; top: 0; inset-inline: 0; height: 5px;
+    background: linear-gradient(90deg, var(--brand), var(--aqua), var(--warning));
+  }
+  .gate-card .brand-mark { width: 62px; height: 62px; border-radius: 18px; margin: 4px auto 16px; }
+  .gate-card .brand-mark svg { width: 38px; height: 38px; }
+  .gate-card h1 { margin: 0 0 7px; font-size: 21px; font-weight: 800; }
+  .gate-card p.sub-txt { margin: 0 0 22px; color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; }
+  #gsiButton { display: flex; justify-content: center; min-height: 44px; }
+  .gate-msg { margin: 18px 0 0; font-size: 14px; line-height: 1.6; display: none; }
+  .gate-msg.show { display: block; }
+  .gate-msg.error { color: var(--critical); font-weight: 600; }
+  .gate-msg.info { color: var(--text-secondary); }
+  .gate-foot { margin-top: 20px; font-size: 12.5px; color: var(--muted); }
+
+  /* פרטי המשתמש המחובר בכותרת */
+  .user-pill {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 6px 5px 11px;
+    border-radius: 999px; border: 1px solid var(--border); background: var(--surface-1);
+    font-size: 13px; color: var(--text-secondary); max-width: 210px;
+  }
+  .user-pill .mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-pill button {
+    border: none; background: var(--gridline); color: var(--text-secondary); cursor: pointer;
+    width: 24px; height: 24px; border-radius: 50%; flex: none; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .user-pill button:hover { background: var(--critical); color: #fff; }
+  @media (max-width: 720px) { .user-pill { max-width: 150px; font-size: 12px; } }
+
   /* ============ alerts ============ */
   .alerts {
     position: relative; overflow: hidden;
@@ -538,6 +584,7 @@
       </div>
     </div>
     <div class="header-actions">
+      <span id="userPill"></span>
       <div class="sync-pill offline" id="syncPill"><span class="dot"></span><span id="syncPillText">לא מחובר לשיטס</span></div>
       <button class="icon-btn only-browser" id="installBtn" title="התקנת האפליקציה">📲</button>
       <button class="icon-btn" id="reportsBtn" title="דוחות">📊</button>
@@ -801,6 +848,26 @@
       <button class="btn primary" id="doInstallBtn" style="display:none;">📲 התקן עכשיו</button>
       <button class="btn" id="closeInstall2">סגירה</button>
     </div>
+  </div>
+</div>
+
+<div class="gate" id="authGate">
+  <div class="gate-card">
+    <div class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2.6" y="6" width="18.8" height="12" rx="3.2" stroke="#fff" stroke-width="1.7"/>
+        <ellipse cx="7" cy="12" rx="2.3" ry="3.7" fill="#fff" fill-opacity=".22" stroke="#fff" stroke-width="1.5"/>
+        <path d="M11.6 9.4c1.15 0 1.15 2.1 2.3 2.1s1.15-2.1 2.3-2.1 1.15 2.1 2.3 2.1"
+              stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M11.6 13.2c1.15 0 1.15 2.1 2.3 2.1s1.15-2.1 2.3-2.1 1.15 2.1 2.3 2.1"
+              stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-opacity=".65"/>
+      </svg>
+    </div>
+    <h1>ניהול הזמנות בדים</h1>
+    <p class="sub-txt">הגישה מוגבלת למשתמשים מאושרים בלבד.<br>יש להתחבר עם חשבון Google.</p>
+    <div id="gsiButton"></div>
+    <p class="gate-msg" id="gateMsg"></p>
+    <div class="gate-foot">🔒 הנתונים מוגנים בשרת — לא ניתן לעקוף את ההרשאה</div>
   </div>
 </div>
 
@@ -1372,6 +1439,94 @@ function toISODate(v) {
   return '';
 }
 
+/* ---------------- הזדהות עם Google ----------------
+   כל עוד GOOGLE_CLIENT_ID ריק, ההזדהות כבויה והאפליקציה פועלת כרגיל.
+   ברגע שמוגדר מזהה — נדרשת התחברות, וההרשאה נבדקת בשרת (Apps Script). */
+const GOOGLE_CLIENT_ID = '';
+const AUTH_ENABLED = !!GOOGLE_CLIENT_ID;
+
+let idToken = '';
+let userEmail = '';
+
+/* פענוח ה-JWT לצורך הצגת המייל בלבד — האימות האמיתי נעשה בשרת */
+function decodeJwt(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (e) { return null; }
+}
+
+const authGate = document.getElementById('authGate');
+
+function showGate(msg, kind) {
+  const m = document.getElementById('gateMsg');
+  if (msg) {
+    m.textContent = msg;
+    m.className = 'gate-msg show ' + (kind || 'info');
+  } else {
+    m.className = 'gate-msg';
+  }
+  authGate.classList.add('open');
+}
+function hideGate() { authGate.classList.remove('open'); }
+
+function renderUserPill() {
+  const el = document.getElementById('userPill');
+  if (!AUTH_ENABLED || !userEmail) { el.innerHTML = ''; return; }
+  el.innerHTML = `<span class="user-pill">
+      <span class="mail">${escapeHtml(userEmail)}</span>
+      <button id="signOutBtn" title="התנתקות">✕</button>
+    </span>`;
+  document.getElementById('signOutBtn').addEventListener('click', signOut);
+}
+
+function onCredential(res) {
+  idToken = res.credential || '';
+  const p = decodeJwt(idToken) || {};
+  userEmail = p.email || '';
+  renderUserPill();
+  hideGate();
+  bootApp();
+}
+
+function signOut() {
+  idToken = '';
+  userEmail = '';
+  orders = [];
+  render();
+  renderUserPill();
+  setSyncStatus('offline', 'מנותק');
+  try { google.accounts.id.disableAutoSelect(); } catch (e) { /* הספרייה לא נטענה */ }
+  showGate('התנתקת בהצלחה. ניתן להתחבר שוב.', 'info');
+}
+
+function initAuth() {
+  if (!AUTH_ENABLED) { bootApp(); return; }
+
+  showGate();
+  /* ממתינים לטעינת ספריית ההזדהות של גוגל */
+  let waited = 0;
+  const timer = setInterval(() => {
+    if (window.google && google.accounts && google.accounts.id) {
+      clearInterval(timer);
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: onCredential,
+        auto_select: true,
+        cancel_on_tap_outside: false,
+      });
+      google.accounts.id.renderButton(document.getElementById('gsiButton'), {
+        theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', width: 260,
+      });
+      google.accounts.id.prompt();
+    } else if ((waited += 150) > 12000) {
+      clearInterval(timer);
+      showGate('לא הצלחתי לטעון את שירות ההתחברות של Google. בדוק את חיבור האינטרנט ורענן.', 'error');
+    }
+  }, 150);
+}
+
 /* ---------------- Google Sheets sync ---------------- */
 /* כתובת הגיליון נשמרת רק בדפדפן של המשתמש ואינה נמצאת בקוד המקור,
    כדי שלא תיחשף כשהאפליקציה מתפרסמת באינטרנט. */
@@ -1429,12 +1584,47 @@ function setSyncStatus(state, text) {
   syncPillText.textContent = text;
 }
 
+/* פנייה אחידה לגיליון.
+   הטוקן נשלח בגוף הבקשה ולעולם לא בכתובת, כדי שלא ידלוף ליומני שרת. */
+async function callSheet(action, extra) {
+  if (!WEBAPP_URL) throw new Error('no_url');
+
+  /* תאימות לסקריפט הישן שתומך רק ב-GET לקריאה */
+  if (!AUTH_ENABLED && action === 'load') {
+    const res = await fetch(WEBAPP_URL + (WEBAPP_URL.includes('?') ? '&' : '?') + 'api=1');
+    return res.json();
+  }
+
+  const res = await fetch(WEBAPP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action, idToken }, extra || {})),
+  });
+  return res.json();
+}
+
+/* מזהה תשובת שרת של דחיית הרשאה ומחזיר את המשתמש למסך הכניסה */
+function handleAuthError(json) {
+  if (!json || json.ok) return false;
+  if (json.error === 'unauthenticated') {
+    idToken = ''; userEmail = ''; renderUserPill();
+    showGate('פג תוקף ההתחברות. יש להתחבר שוב.', 'info');
+    return true;
+  }
+  if (json.error === 'forbidden') {
+    idToken = ''; userEmail = ''; renderUserPill();
+    showGate(`לחשבון ${json.email || 'הזה'} אין הרשאת גישה לאפליקציה.`, 'error');
+    return true;
+  }
+  return false;
+}
+
 async function loadFromSheet(silent) {
   if (!WEBAPP_URL) return false;
   setSyncStatus('syncing', 'טוען מהגיליון...');
   try {
-    const res = await fetch(WEBAPP_URL + (WEBAPP_URL.includes('?') ? '&' : '?') + 'api=1');
-    const json = await res.json();
+    const json = await callSheet('load');
+    if (handleAuthError(json)) { setSyncStatus('error', 'אין הרשאה'); return false; }
     if (!json || !json.ok) throw new Error('bad response');
     orders = (json.rows || [])
       .filter(r => String(r['שם הלקוח'] || '').trim())
@@ -1467,11 +1657,9 @@ async function saveToSheet() {
     h === 'סה״כ לתשלום' ? orderTotal(o) : (o[HEADER_MAP[h]] ?? '')
   ));
   try {
-    await fetch(WEBAPP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ headers: SHEET_HEADERS, rows }),
-    });
+    const json = await callSheet('save', { headers: SHEET_HEADERS, rows });
+    if (handleAuthError(json)) { setSyncStatus('error', 'אין הרשאה'); return; }
+    if (json && json.ok === false) throw new Error(json.error || 'save failed');
     const now = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
     setSyncStatus('synced', `נשמר ✓ ${now}`);
   } catch (err) {
@@ -1493,8 +1681,15 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
   if (!url) { showToast('נא להדביק קודם כתובת'); return; }
   setSyncStatus('syncing', 'בודק חיבור...');
   try {
-    const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'api=1');
+    const res = AUTH_ENABLED
+      ? await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'load', idToken }),
+        })
+      : await fetch(url + (url.includes('?') ? '&' : '?') + 'api=1');
     const json = await res.json();
+    if (handleAuthError(json)) { return; }
     if (json && json.ok) {
       setSyncStatus('synced', `מחובר ✓ (${(json.rows||[]).length} שורות)`);
       showToast(`החיבור תקין! נמצאו ${(json.rows||[]).length} שורות בגיליון`);
@@ -1950,18 +2145,23 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 }
 
 /* ---------------- init ---------------- */
-render();
-if (WEBAPP_URL) {
-  loadFromSheet(true);
-} else {
-  setSyncStatus('offline', 'לא מחובר לשיטס');
-  /* הפעלה ראשונה במכשיר הזה — פותחים את ההגדרות כדי לחבר את הגיליון */
-  setTimeout(() => {
-    document.getElementById('webappUrlInput').value = '';
-    settingsOverlay.classList.add('open');
-    showToast('חבר את הגיליון כדי להתחיל');
-  }, 500);
+/* מופעל אחרי שההזדהות עברה בהצלחה (או מיד, כשההזדהות כבויה) */
+function bootApp() {
+  render();
+  if (WEBAPP_URL) {
+    loadFromSheet(true);
+  } else {
+    setSyncStatus('offline', 'לא מחובר לשיטס');
+    /* הפעלה ראשונה במכשיר הזה — פותחים את ההגדרות כדי לחבר את הגיליון */
+    setTimeout(() => {
+      document.getElementById('webappUrlInput').value = '';
+      settingsOverlay.classList.add('open');
+      showToast('חבר את הגיליון כדי להתחיל');
+    }, 500);
+  }
 }
+
+initAuth();
 </script>
 </body>
 </html>
