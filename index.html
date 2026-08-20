@@ -101,12 +101,42 @@
   .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
   @media (max-width: 900px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   .stat {
-    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
-    padding: 16px; box-shadow: var(--shadow);
+    position: relative; overflow: hidden;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+    padding: 17px 16px 15px;
+    box-shadow: 0 1px 2px rgba(11,11,11,0.05), 0 10px 26px rgba(11,11,11,0.07);
+    transition: transform .18s cubic-bezier(.2,.9,.3,1.1), box-shadow .18s ease;
   }
-  .stat .label { font-size: 14px; color: var(--text-secondary); display:flex; align-items:center; gap:6px; margin-bottom: 8px; }
-  .stat .value { font-size: 26px; font-weight: 800; font-variant-numeric: proportional-nums; }
-  .stat .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  [data-theme="dark"] .stat { box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 26px rgba(0,0,0,0.45); }
+  /* פס הצבע העליון */
+  .stat::before {
+    content: ''; position: absolute; top: 0; inset-inline: 0; height: 4px;
+    background: var(--accent, var(--brand));
+  }
+  /* זוהר עדין בפינה, בצבע האריח */
+  .stat::after {
+    content: ''; position: absolute; top: -30px; inset-inline-end: -30px;
+    width: 90px; height: 90px; border-radius: 50%;
+    background: var(--accent, var(--brand)); opacity: .07; pointer-events: none;
+  }
+  .stat:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 2px 4px rgba(11,11,11,0.06), 0 18px 40px rgba(11,11,11,0.12);
+  }
+  [data-theme="dark"] .stat:hover { box-shadow: 0 2px 4px rgba(0,0,0,0.5), 0 18px 40px rgba(0,0,0,0.6); }
+  .stat .label {
+    font-size: 14px; color: var(--text-secondary); display: flex; align-items: center;
+    gap: 8px; margin-bottom: 9px; position: relative; z-index: 1;
+  }
+  .stat .stat-icon {
+    width: 26px; height: 26px; border-radius: 8px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 14px;
+    background: var(--accent, var(--brand)); color: #fff;
+  }
+  .stat .value {
+    font-size: 27px; font-weight: 800; font-variant-numeric: proportional-nums;
+    position: relative; z-index: 1; letter-spacing: -0.01em;
+  }
 
   /* toolbar */
   .toolbar {
@@ -263,6 +293,49 @@
   }
   .brand-mark svg { width: 28px; height: 28px; display: block; }
 
+  /* ============ alerts ============ */
+  .alerts {
+    position: relative; overflow: hidden;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+    margin-bottom: 16px; padding: 15px 17px 13px;
+    box-shadow: 0 1px 2px rgba(11,11,11,0.05), 0 10px 26px rgba(11,11,11,0.07);
+    animation: modalIn .35s cubic-bezier(.2,.9,.3,1.15);
+  }
+  [data-theme="dark"] .alerts { box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 26px rgba(0,0,0,0.45); }
+  .alerts::before {
+    content: ''; position: absolute; top: 0; inset-inline: 0; height: 4px;
+    background: linear-gradient(90deg, var(--critical), var(--warning));
+  }
+  .alerts-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 11px; font-weight: 700; font-size: 15.5px;
+  }
+  .alerts-head .left { display: flex; align-items: center; gap: 8px; }
+  .alerts-count {
+    font-size: 13px; font-weight: 700; padding: 1px 9px; border-radius: 999px;
+    background: var(--critical); color: #fff; font-variant-numeric: tabular-nums;
+  }
+  .alert-row {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 11px; margin-bottom: 6px; border-radius: 10px; cursor: pointer;
+    border: 1px solid transparent; background: var(--surface-2);
+    font-family: inherit; font-size: 14.5px; text-align: start; color: var(--text-primary);
+    transition: border-color .15s ease, transform .12s ease;
+  }
+  .alert-row:last-child { margin-bottom: 0; }
+  .alert-row:hover { border-color: var(--border); transform: translateX(-3px); }
+  .alert-row .ico {
+    width: 30px; height: 30px; border-radius: 9px; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .alert-row.critical .ico { background: var(--critical-tint); }
+  .alert-row.warning  .ico { background: var(--warning-tint); }
+  .alert-row .txt { flex: 1 1 auto; min-width: 0; }
+  .alert-row .when { font-weight: 700; white-space: nowrap; font-size: 13.5px; }
+  .alert-row.critical .when { color: var(--critical); }
+  .alert-row.warning  .when { color: var(--warning); }
+  .alerts-more { font-size: 13.5px; color: var(--muted); margin-top: 8px; }
+
   /* ============ status tabs ============ */
   .tabs {
     display: flex; gap: 6px; padding: 6px; margin-bottom: 16px;
@@ -321,6 +394,40 @@
   .rep-amount { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
   .rep-empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
   @media (max-width: 560px) { .rep-grid { grid-template-columns: 1fr; } }
+
+  /* ============ customer history ============ */
+  .cust-link {
+    background: none; border: none; padding: 0; font: inherit; font-weight: 700;
+    color: var(--brand); cursor: pointer; text-align: start;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .cust-link:hover { text-decoration: underline; }
+  .cust-link .chev { font-size: 11px; opacity: .6; }
+  .hist-contact { font-size: 14px; color: var(--text-secondary); margin: 0 0 4px; line-height: 1.7; }
+  .hist-row {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 11px; align-items: center;
+    width: 100%; padding: 11px 13px; margin-bottom: 7px; border-radius: 11px;
+    border: 1px solid var(--border); background: var(--surface-2); cursor: pointer;
+    font-family: inherit; font-size: 14.5px; text-align: start; color: var(--text-primary);
+    border-inline-start: 4px solid var(--gridline);
+    transition: transform .12s ease, border-color .15s ease;
+  }
+  .hist-row:hover { transform: translateX(-3px); }
+  .hist-row.stage-pending { border-inline-start-color: var(--warning); }
+  .hist-row.stage-unpaid  { border-inline-start-color: var(--critical); }
+  .hist-row.stage-done    { border-inline-start-color: var(--good); }
+  .hist-row .date { font-variant-numeric: tabular-nums; color: var(--text-secondary); font-size: 13.5px; white-space: nowrap; }
+  .hist-row .mid { min-width: 0; }
+  .hist-row .mid .top { display: block; font-weight: 700; }
+  .hist-row .mid .bot {
+    display: block; color: var(--muted); font-size: 13px; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hist-row .sum { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (max-width: 560px) {
+    .hist-row { grid-template-columns: 1fr auto; }
+    .hist-row .date { grid-column: 1 / -1; order: -1; }
+  }
 
   /* ============ install diagnostics ============ */
   .diag-box {
@@ -438,6 +545,8 @@
       <button class="icon-btn" id="themeToggle" title="החלף מצב תצוגה">🌙</button>
     </div>
   </header>
+
+  <div id="alertsPanel"></div>
 
   <div class="stats" id="statsRow"></div>
 
@@ -633,6 +742,20 @@
   </div>
 </div>
 
+<div class="overlay" id="customerOverlay">
+  <div class="modal stripe-aqua" style="max-width:600px;">
+    <div class="modal-head">
+      <h2 id="customerTitle">היסטוריית לקוח</h2>
+      <button class="icon-btn" id="closeCustomer">✕</button>
+    </div>
+    <div class="modal-body" id="customerBody" style="grid-template-columns:1fr;"></div>
+    <div class="modal-foot">
+      <button class="btn" id="newForCustomerBtn">＋ הזמנה חדשה ללקוח</button>
+      <button class="btn primary" id="closeCustomer2">סגירה</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="installOverlay">
   <div class="modal stripe-aqua" style="max-width:520px;">
     <div class="modal-head">
@@ -733,9 +856,92 @@ let activeStage = 'all';
 
 /* ---------------- rendering ---------------- */
 function render() {
+  renderAlerts();
   renderStats();
   renderTabCounts();
   renderTable();
+}
+
+/* ---------------- alerts ---------------- */
+let alertsDismissed = false;
+
+/* אוסף כל מה שדורש טיפול בימים הקרובים, ממוין מהדחוף ביותר */
+function computeAlerts() {
+  const list = [];
+  const who = o => o.name || 'לקוח';
+  /* "יום" ביחיד, "N ימים" ברבים */
+  const days = n => n === 1 ? 'יום' : `${n} ימים`;
+  const late = n => `באיחור ${days(n)}`;
+  const soon = n => `בעוד ${days(n)}`;
+  const past = n => n === 1 ? 'עבר יום' : `עברו ${n} ימים`;
+
+  orders.forEach(o => {
+    /* צ׳ק שצריך להפקיד */
+    if (o.payment === 'צק' && o.checkDueDate) {
+      const d = daysUntil(o.checkDueDate);
+      if (d !== null && d <= 7) list.push({
+        sev: d <= 0 ? 'critical' : 'warning', icon: '🏦', id: o.id, sort: d,
+        text: `צ׳ק מ${who(o)} · ${fmtCurrency(orderTotal(o))}`,
+        when: d < 0 ? late(-d) : d === 0 ? 'להפקיד היום' : soon(d),
+      });
+    }
+    /* משלוח שעבר תאריך ולא יצא */
+    if (o.deliveryStatus !== 'נשלח' && o.deliveryDate) {
+      const d = daysUntil(o.deliveryDate);
+      if (d !== null && d < 0) list.push({
+        sev: 'critical', icon: '🚚', id: o.id, sort: d,
+        text: `משלוח ל${who(o)} טרם יצא`, when: late(-d),
+      });
+    }
+    /* תזכורת שהגיע זמנה */
+    if (o.reminderDate) {
+      const d = daysUntil(o.reminderDate);
+      if (d !== null && d <= 2) list.push({
+        sev: d < 0 ? 'critical' : 'warning', icon: '🔔', id: o.id, sort: d,
+        text: `תזכורת: ${who(o)}`,
+        when: d < 0 ? past(-d) : d === 0 ? 'היום' : soon(d),
+      });
+    }
+    /* חובת מספר הקצאה שלא מולאה */
+    if (orderTotal(o) > ALLOCATION_THRESHOLD && !String(o.allocationNumber || '').trim()) {
+      list.push({
+        sev: 'critical', icon: '⚠️', id: o.id, sort: -999,
+        text: `חסר מספר הקצאה — ${who(o)}`, when: fmtCurrency(orderTotal(o)),
+      });
+    }
+  });
+
+  return list.sort((a, b) => a.sort - b.sort);
+}
+
+function renderAlerts() {
+  const panel = document.getElementById('alertsPanel');
+  const list = alertsDismissed ? [] : computeAlerts();
+  if (!list.length) { panel.innerHTML = ''; return; }
+
+  const shown = list.slice(0, 5);
+  panel.innerHTML = `
+    <div class="alerts">
+      <div class="alerts-head">
+        <span class="left">🔔 דורש טיפול <span class="alerts-count">${list.length}</span></span>
+        <button class="btn small ghost" id="dismissAlerts">הסתר</button>
+      </div>
+      ${shown.map(a => `
+        <button class="alert-row ${a.sev}" data-id="${a.id}">
+          <span class="ico">${a.icon}</span>
+          <span class="txt">${escapeHtml(a.text)}</span>
+          <span class="when">${escapeHtml(a.when)}</span>
+        </button>`).join('')}
+      ${list.length > shown.length
+        ? `<div class="alerts-more">ועוד ${list.length - shown.length} פריטים שדורשים טיפול</div>` : ''}
+    </div>`;
+
+  panel.querySelectorAll('.alert-row').forEach(b =>
+    b.addEventListener('click', () => openModal(b.dataset.id)));
+  document.getElementById('dismissAlerts').addEventListener('click', () => {
+    alertsDismissed = true;
+    renderAlerts();
+  });
 }
 
 function renderTabCounts() {
@@ -766,8 +972,8 @@ function renderStats() {
   ];
 
   document.getElementById('statsRow').innerHTML = stats.map(s => `
-    <div class="stat">
-      <div class="label"><span class="dot" style="background:${s.color}"></span>${s.icon} ${s.label}</div>
+    <div class="stat" style="--accent:${s.color}">
+      <div class="label"><span class="stat-icon">${s.icon}</span>${s.label}</div>
       <div class="value">${s.value}</div>
     </div>
   `).join('');
@@ -837,7 +1043,11 @@ function renderTable() {
     return `
       <tr class="stage-${orderStage(o)}">
         <td data-label="לקוח">
-          <div class="cust">${escapeHtml(o.name || '—')}</div>
+          <div class="cust">
+            <button class="cust-link" title="הצג את כל ההזמנות של הלקוח" onclick="openCustomerByOrder('${o.id}')">
+              ${escapeHtml(o.name || '—')}<span class="chev">▾</span>
+            </button>
+          </div>
           <div class="sub">${fmtPhone(o.phone)}${o.email ? ' · ' + escapeHtml(o.email) : ''}</div>
         </td>
         <td data-label="כמות">
@@ -1484,6 +1694,103 @@ document.getElementById('exportReportBtn').addEventListener('click', () => {
   XLSX.utils.book_append_sheet(wb, ws, 'דוח');
   XLSX.writeFile(wb, `דוח_הזמנות_${new Date().toISOString().slice(0,10)}.xlsx`);
   showToast('הדוח יוצא בהצלחה');
+});
+
+/* ---------------- customer history ---------------- */
+const customerOverlay = document.getElementById('customerOverlay');
+let currentCustomer = '';
+
+function ordersOfCustomer(name) {
+  const key = String(name || '').trim().toLowerCase();
+  return orders.filter(o => String(o.name || '').trim().toLowerCase() === key);
+}
+
+/* נקרא מהטבלה — מאתר את הלקוח לפי ההזמנה שנלחצה */
+function openCustomerByOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (o) openCustomer(o.name);
+}
+
+function openCustomer(name) {
+  currentCustomer = String(name || '').trim();
+  const list = ordersOfCustomer(currentCustomer)
+    .slice()
+    .sort((a, b) => String(b.deliveryDate || '').localeCompare(String(a.deliveryDate || '')));
+
+  document.getElementById('customerTitle').textContent = currentCustomer || 'לקוח ללא שם';
+
+  const total    = list.reduce((s, o) => s + orderTotal(o), 0);
+  const owed     = list.filter(o => !isPaid(o)).reduce((s, o) => s + orderTotal(o), 0);
+  const shipping = list.reduce((s, o) => s + orderShipping(o), 0);
+  const contact  = list.find(o => o.phone || o.email || o.address) || {};
+  const avg      = list.length ? Math.round(total / list.length) : 0;
+
+  document.getElementById('customerBody').innerHTML = `
+    ${(contact.phone || contact.email || contact.address) ? `
+      <p class="hist-contact">
+        ${contact.phone ? `📞 ${escapeHtml(fmtPhone(contact.phone))}<br>` : ''}
+        ${contact.email ? `✉️ ${escapeHtml(contact.email)}<br>` : ''}
+        ${contact.address ? `📍 ${escapeHtml(contact.address)}` : ''}
+      </p>` : ''}
+
+    <div class="rep-grid">
+      <div class="rep-card">
+        <div class="k">📦 סה״כ הזמנות</div>
+        <div class="v">${list.length}</div>
+      </div>
+      <div class="rep-card">
+        <div class="k">💵 סה״כ רכישות</div>
+        <div class="v">${fmtCurrency(total)}</div>
+        ${shipping ? `<div class="note">מתוכם ${fmtCurrency(shipping)} דמי משלוח</div>` : ''}
+      </div>
+      <div class="rep-card">
+        <div class="k">⚠️ חוב פתוח</div>
+        <div class="v" style="color:${owed ? 'var(--critical)' : 'var(--good)'}">${fmtCurrency(owed)}</div>
+        <div class="note">${owed ? 'טרם שולם' : 'הכל שולם ✓'}</div>
+      </div>
+      <div class="rep-card">
+        <div class="k">📊 ממוצע להזמנה</div>
+        <div class="v">${fmtCurrency(avg)}</div>
+      </div>
+    </div>
+
+    <div class="rep-section">
+      <h3>כל ההזמנות <span class="sub" style="font-weight:400;">(לחיצה פותחת לעריכה)</span></h3>
+      ${list.map(o => `
+        <button class="hist-row stage-${orderStage(o)}" data-id="${o.id}">
+          <span class="date">${fmtDate(o.deliveryDate)}</span>
+          <span class="mid">
+            <span class="top">${o.qty ? escapeHtml(String(o.qty)) + ' יח׳' : 'הזמנה'} · ${STAGE_LABEL[orderStage(o)]}</span>
+            <span class="bot">${escapeHtml(o.payment || '—')}${o.notes ? ' · ' + escapeHtml(String(o.notes).slice(0, 40)) : ''}</span>
+          </span>
+          <span class="sum">${fmtCurrency(orderTotal(o))}</span>
+        </button>`).join('')}
+    </div>
+  `;
+
+  document.querySelectorAll('#customerBody .hist-row').forEach(b =>
+    b.addEventListener('click', () => { closeCustomer(); openModal(b.dataset.id); }));
+
+  customerOverlay.classList.add('open');
+}
+
+function closeCustomer() { customerOverlay.classList.remove('open'); }
+
+document.getElementById('closeCustomer').addEventListener('click', closeCustomer);
+document.getElementById('closeCustomer2').addEventListener('click', closeCustomer);
+customerOverlay.addEventListener('click', (e) => { if (e.target === customerOverlay) closeCustomer(); });
+
+/* הזמנה חדשה עם פרטי הלקוח כבר ממולאים */
+document.getElementById('newForCustomerBtn').addEventListener('click', () => {
+  const c = ordersOfCustomer(currentCustomer).find(o => o.phone || o.email || o.address) || {};
+  const name = currentCustomer;
+  closeCustomer();
+  openModal(null);
+  document.getElementById('f_name').value = name;
+  document.getElementById('f_phone').value = c.phone || '';
+  document.getElementById('f_email').value = c.email || '';
+  document.getElementById('f_address').value = c.address || '';
+  document.getElementById('f_qty').focus();
 });
 
 /* ---------------- PWA install ---------------- */
