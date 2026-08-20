@@ -1608,7 +1608,9 @@ function handleAuthError(json) {
   if (!json || json.ok) return false;
   if (json.error === 'unauthenticated') {
     idToken = ''; userEmail = ''; renderUserPill();
-    showGate('פג תוקף ההתחברות. יש להתחבר שוב.', 'info');
+    showGate(json.reason
+      ? `השרת דחה את ההתחברות. סיבה: ${json.reason}`
+      : 'פג תוקף ההתחברות. יש להתחבר שוב.', json.reason ? 'error' : 'info');
     return true;
   }
   if (json.error === 'forbidden') {
