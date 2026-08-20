@@ -322,6 +322,18 @@
   .rep-empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
   @media (max-width: 560px) { .rep-grid { grid-template-columns: 1fr; } }
 
+  /* ============ install diagnostics ============ */
+  .diag-box {
+    border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+    background: var(--surface-2); margin: 4px 0 14px; font-size: 14px;
+  }
+  .diag-title {
+    display: flex; align-items: center; justify-content: space-between;
+    font-weight: 700; margin-bottom: 9px; gap: 10px;
+  }
+  #installDiag div { display: flex; gap: 7px; align-items: flex-start; margin-bottom: 5px; line-height: 1.5; }
+  #installDiag .why { color: var(--muted); font-size: 13px; margin: 2px 0 8px 22px; display: block; }
+
   /* ============ install button ============ */
   .install-note { grid-column: 1/-1; font-size: 14px; line-height: 1.7; color: var(--text-secondary); margin: 0; }
   .install-note strong { color: var(--text-primary); }
@@ -633,11 +645,20 @@
       </div>
       <div id="installManual">
         <p class="install-note" id="installIntro"></p>
+
+        <div class="diag-box">
+          <div class="diag-title">
+            <span>🔍 בדיקת מצב</span>
+            <button class="btn small" id="copyDiagBtn">העתקה</button>
+          </div>
+          <div id="installDiag">בודק…</div>
+        </div>
+
         <p class="install-note"><strong>📱 אנדרואיד (Chrome)</strong></p>
         <p class="install-note"><ol>
           <li>פתח את האפליקציה בכתובת האינטרנט שלה</li>
           <li>לחץ על ⋮ בפינה העליונה</li>
-          <li>בחר <strong>הוספה למסך הבית</strong></li>
+          <li>בחר <strong>התקנת אפליקציה</strong> — אם כתוב "הוספה למסך הבית" זו רק קיצור דרך</li>
         </ol></p>
         <p class="install-note"><strong>🍏 אייפון (Safari)</strong></p>
         <p class="install-note"><ol>
@@ -1486,18 +1507,116 @@ function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
+/* בדיקה שמראה בדיוק איזה תנאי התקנה חסר, במקום לנחש */
+let lastDiagText = '';
+
+async function runDiagnostics() {
+  const el = document.getElementById('installDiag');
+  el.textContent = 'בודק…';
+  const out = [];
+
+  /* 1. חיבור מאובטח */
+  out.push({
+    ok: window.isSecureContext,
+    label: 'חיבור מאובטח (https)',
+    why: `הכתובת היא ${location.protocol}// — התקנה מחייבת https`,
+  });
+
+  /* 2. מניפסט */
+  let mOk = false, mWhy = '';
+  const link = document.querySelector('link[rel="manifest"]');
+  if (!link) {
+    mWhy = 'אין תגית manifest בדף';
+  } else {
+    try {
+      const res = await fetch(link.href, { cache: 'no-store' });
+      if (!res.ok) {
+        mWhy = `manifest.json מחזיר שגיאה ${res.status} — ייתכן שהאתר עדיין בבנייה`;
+      } else {
+        const j = await res.json();
+        const icons = j.icons || [];
+        const has192 = icons.some(i => String(i.sizes || '').includes('192'));
+        const has512 = icons.some(i => String(i.sizes || '').includes('512'));
+        if (!j.name || !j.start_url) mWhy = 'חסרים שדות חובה (name / start_url)';
+        else if (!has192 || !has512) mWhy = 'חסר סמל בגודל 192 או 512';
+        else if (j.display !== 'standalone' && j.display !== 'fullscreen') mWhy = `display הוא "${j.display}" ולא standalone`;
+        else mOk = true;
+      }
+    } catch (e) {
+      mWhy = 'לא הצלחתי לקרוא את המניפסט: ' + e.message;
+    }
+  }
+  out.push({ ok: mOk, label: 'מניפסט תקין', why: mWhy });
+
+  /* 3. הסמלים נגישים */
+  let iOk = false, iWhy = '';
+  try {
+    const r = await Promise.all([
+      fetch('icon-192.png', { cache: 'no-store' }),
+      fetch('icon-512.png', { cache: 'no-store' }),
+    ]);
+    iOk = r.every(x => x.ok);
+    if (!iOk) iWhy = 'אחד מקבצי הסמלים לא נמצא בשרת';
+  } catch (e) { iWhy = 'שגיאה בטעינת הסמלים: ' + e.message; }
+  out.push({ ok: iOk, label: 'קבצי הסמלים נגישים', why: iWhy });
+
+  /* 4. Service Worker */
+  let swOk = false, swWhy = '';
+  if (!('serviceWorker' in navigator)) {
+    swWhy = 'הדפדפן אינו תומך ב-Service Worker';
+  } else {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && (reg.active || reg.installing || reg.waiting)) swOk = true;
+      else if (swError) swWhy = 'הרישום נכשל: ' + swError;
+      else swWhy = 'טרם נרשם — רענן את הדף פעם אחת ונסה שוב';
+    } catch (e) { swWhy = e.message; }
+  }
+  out.push({ ok: swOk, label: 'Service Worker פעיל', why: swWhy });
+
+  /* 5. האם הדפדפן מוכן להתקין */
+  const installed = isStandalone();
+  out.push({
+    ok: installed || !!deferredPrompt,
+    label: installed ? 'האפליקציה מותקנת' : 'הדפדפן מציע התקנה',
+    why: 'ייתכן שהאפליקציה כבר מותקנת, או שהדפדפן אינו תומך בהתקנה (Safari, פיירפוקס)',
+  });
+
+  el.innerHTML = out.map(o =>
+    `<div><span>${o.ok ? '✅' : '❌'}</span><span>${escapeHtml(o.label)}</span></div>` +
+    (o.ok || !o.why ? '' : `<span class="why">${escapeHtml(o.why)}</span>`)
+  ).join('');
+
+  lastDiagText = [
+    'בדיקת התקנה — ' + new Date().toLocaleString('he-IL'),
+    'כתובת: ' + location.href,
+    'דפדפן: ' + navigator.userAgent,
+    '',
+    ...out.map(o => `${o.ok ? '[תקין]' : '[בעיה]'} ${o.label}${o.ok || !o.why ? '' : ' — ' + o.why}`),
+  ].join('\n');
+}
+
+document.getElementById('copyDiagBtn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(lastDiagText);
+    showToast('הבדיקה הועתקה — אפשר להדביק בצ׳אט');
+  } catch (e) {
+    showToast('ההעתקה נכשלה — צלם מסך במקום');
+  }
+});
+
 function openInstall() {
   const intro = document.getElementById('installIntro');
   if (isStandalone()) {
     intro.innerHTML = '<strong>✅ האפליקציה כבר מותקנת</strong> — אתה משתמש בה כרגע כתוכנה עצמאית.';
   } else if (location.protocol === 'file:') {
     intro.innerHTML = '<strong>⚠️ הקובץ נפתח ישירות מהמחשב</strong> — בשיטה הזו לא ניתן להתקין. ' +
-      'כדי להתקין, האפליקציה צריכה להיות מאוחסנת בכתובת אינטרנט (https). ' +
-      'ההוראות למטה מתייחסות למצב שבו היא כבר מאוחסנת.';
+      'כדי להתקין, האפליקציה צריכה להיות מאוחסנת בכתובת אינטרנט (https).';
   } else {
     intro.innerHTML = 'אפשר להתקין את האפליקציה כך שתיפתח כמו תוכנה רגילה, עם סמל משלה ובלי שורת כתובת.';
   }
   installOverlay.classList.add('open');
+  runDiagnostics();
 }
 function closeInstall() { installOverlay.classList.remove('open'); }
 
@@ -1514,11 +1633,13 @@ document.getElementById('doInstallBtn').addEventListener('click', async () => {
   document.getElementById('doInstallBtn').style.display = 'none';
 });
 
-/* רישום Service Worker — פועל רק כשהאפליקציה מאוחסנת באינטרנט, ונכשל בשקט אחרת */
+/* רישום Service Worker — פועל רק כשהאפליקציה מאוחסנת באינטרנט.
+   שגיאה נשמרת כדי שתופיע בבדיקת המצב, במקום להיבלע בשקט. */
+let swError = '';
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
+  navigator.serviceWorker.register('sw.js')
+    .then(() => { swError = ''; })
+    .catch(err => { swError = String(err && err.message || err); console.error('SW registration failed:', err); });
 }
 
 /* ---------------- init ---------------- */
