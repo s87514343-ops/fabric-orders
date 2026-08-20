@@ -555,7 +555,15 @@
     .modal-foot .btn { flex: 1 1 45%; justify-content: center; min-height: 46px; }
     .modal-body { padding: 16px; gap: 12px; }
     .field input, .field select, .field textarea { min-height: 46px; font-size: 16px; }
-    .fab { width: 60px; height: 60px; bottom: calc(22px + env(safe-area-inset-bottom)); }
+    /* הכפתור המרחף נבלע מאחורי סרגל הניווט של אנדרואיד, שאינו מדווח
+       על גובהו דרך env(). במקומו — כפתור מלא ברוחב בתוך סרגל הכלים,
+       שנמצא בזרימת הדף ולכן תמיד נראה. */
+    .fab { display: none !important; }
+    #addBtn {
+      display: inline-flex; grid-column: 1 / -1; order: -1;
+      font-size: 16px; min-height: 50px;
+    }
+    .search-box { order: -2; }
   }
   @keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
