@@ -890,6 +890,12 @@
         <label>דמי משלוח (₪)</label>
         <input type="number" id="f_shipping" min="0" step="0.5" placeholder="0">
       </div>
+      <div class="field full">
+        <label>🎯 סה״כ שאני רוצה לקבל (כולל מע״מ)
+          <span style="font-weight:400; color:var(--muted);">— הזן כאן, והמחיר ליחידה והסכום לפני מע״מ יחושבו לאחור</span>
+        </label>
+        <input type="number" id="f_target" min="0" step="0.5" placeholder="לדוגמה: 3000">
+      </div>
       <div class="total-box">
         <div class="line"><span>סכום המוצרים</span><span id="sumProducts">₪0</span></div>
         <div class="line"><span>דמי משלוח</span><span id="sumShipping">₪0</span></div>
@@ -1053,9 +1059,13 @@
             <label>דמי משלוח (₪)</label>
             <input type="number" id="q_ship" min="0" step="0.5">
           </div>
-          <div class="field full">
-            <label>שיעור מע״מ (%) <span style="font-weight:400; color:var(--muted);">— הסכומים למעלה הם לפני מע״מ, והמע״מ מתווסף בתחתית הטבלה</span></label>
+          <div class="field">
+            <label>שיעור מע״מ (%)</label>
             <input type="number" id="q_vat" min="0" max="100" step="0.1">
+          </div>
+          <div class="field">
+            <label>🎯 סה״כ רצוי (כולל מע״מ)</label>
+            <input type="number" id="q_target" min="0" step="0.5" placeholder="חישוב לאחור">
           </div>
           <div class="field full">
             <label>הערת סיום</label>
@@ -1236,7 +1246,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 13';
+const APP_VERSION = '2026.08.25 · 14';
 
 let orders = [];
 let editingId = null;
@@ -1607,6 +1617,8 @@ function openModal(id) {
   document.getElementById('f_unit_price').value = order?.unitPrice ?? '';
   document.getElementById('f_amount').value = order?.amount ?? '';
   document.getElementById('f_shipping').value = order?.shippingCost ?? '';
+  /* היעד מוצג כסה״כ הנוכחי — אפשר לשנות אותו וכל השאר יחושב לאחור */
+  document.getElementById('f_target').value = order ? Math.round(orderTotal(order) * 100) / 100 : '';
   document.getElementById('f_allocation').value = order?.allocationNumber || '';
   toggleAllocationField();
   document.getElementById('f_payment').value = order?.payment || 'לא שולם';
@@ -1660,11 +1672,35 @@ function recalcAmountFromUnits() {
   const qty = Number(document.getElementById('f_qty').value) || 0;
   const unitPrice = Number(document.getElementById('f_unit_price').value) || 0;
   if (qty > 0 && unitPrice > 0) {
-    document.getElementById('f_amount').value = qty * unitPrice;
+    document.getElementById('f_amount').value = Math.round(qty * unitPrice * 100) / 100;
     toggleAllocationField();
   }
 }
-document.getElementById('f_qty').addEventListener('input', recalcAmountFromUnits);
+
+/* חישוב לאחור: מהסה״כ הרצוי (כולל מע״מ) אל הסכום לפני מע״מ ואל
+   המחיר ליחידה. הסכום לפני מע״מ נשמר מדויק כדי שהסה״כ ייצא בדיוק
+   כפי שהוזן; המחיר ליחידה מעוגל לאגורות להצגה. */
+function backCalcFromTarget() {
+  const grand = Number(document.getElementById('f_target').value) || 0;
+  if (grand <= 0) return false;
+  const shipping = Number(document.getElementById('f_shipping').value) || 0;
+  const subtotal = grand / (1 + VAT_RATE / 100);
+  const products = Math.max(0, subtotal - shipping);
+  document.getElementById('f_amount').value = Math.round(products * 100) / 100;
+  const qty = Number(document.getElementById('f_qty').value) || 0;
+  if (qty > 0) {
+    document.getElementById('f_unit_price').value = Math.round((products / qty) * 100) / 100;
+  }
+  toggleAllocationField();
+  return true;
+}
+
+document.getElementById('f_target').addEventListener('input', backCalcFromTarget);
+/* שינוי כמות או משלוח כשיש יעד — היעד גובר ומחושב מחדש */
+document.getElementById('f_qty').addEventListener('input', () => {
+  if (!backCalcFromTarget()) recalcAmountFromUnits();
+});
+document.getElementById('f_shipping').addEventListener('input', () => { backCalcFromTarget(); });
 document.getElementById('f_unit_price').addEventListener('input', recalcAmountFromUnits);
 
 document.getElementById('addBtn').addEventListener('click', () => openModal(null));
@@ -2519,6 +2555,7 @@ function openQuote(orderId) {
   document.getElementById('q_unit').value = o ? (o.unitPrice ?? '') : '';
   document.getElementById('q_amount').value = o ? orderProducts(o) : '';
   document.getElementById('q_ship').value = o ? orderShipping(o) : '';
+  document.getElementById('q_target').value = o ? Math.round(orderTotal(o) * 100) / 100 : '';
   document.getElementById('q_vat').value = p.vat;
   document.getElementById('q_note').value = p.note;
   document.getElementById('q_contact').value = p.contact;
@@ -2564,7 +2601,28 @@ Object.keys(QUOTE_FIELDS).forEach(id => {
   }));
 });
 
-document.getElementById('q_qty').addEventListener('input', recalcQuoteAmount);
+/* חישוב לאחור בהצעת המחיר — זהה לזה שבחלון ההזמנה */
+function backCalcQuote() {
+  const grand = Number(document.getElementById('q_target').value) || 0;
+  if (grand <= 0) return false;
+  const ship = Number(document.getElementById('q_ship').value) || 0;
+  const rate = (Number(document.getElementById('q_vat').value) || 0) / 100;
+  const products = Math.max(0, grand / (1 + rate) - ship);
+  document.getElementById('q_amount').value = Math.round(products * 100) / 100;
+  const qty = Number(document.getElementById('q_qty').value) || 0;
+  if (qty > 0) {
+    document.getElementById('q_unit').value = Math.round((products / qty) * 100) / 100;
+  }
+  renderQuote();
+  return true;
+}
+
+document.getElementById('q_target').addEventListener('input', backCalcQuote);
+document.getElementById('q_qty').addEventListener('input', () => {
+  if (!backCalcQuote()) recalcQuoteAmount();
+});
+document.getElementById('q_ship').addEventListener('input', () => { backCalcQuote(); });
+document.getElementById('q_vat').addEventListener('input', () => { backCalcQuote(); });
 document.getElementById('q_unit').addEventListener('input', recalcQuoteAmount);
 
 document.getElementById('closeQuote').addEventListener('click', closeQuote);
