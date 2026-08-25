@@ -862,6 +862,8 @@
       <div class="total-box">
         <div class="line"><span>סכום המוצרים</span><span id="sumProducts">₪0</span></div>
         <div class="line"><span>דמי משלוח</span><span id="sumShipping">₪0</span></div>
+        <div class="line"><span>סכום ביניים (לפני מע״מ)</span><span id="sumSubtotal">₪0</span></div>
+        <div class="line"><span id="sumVatLabel">מע״מ</span><span id="sumVat">₪0</span></div>
         <div class="line grand"><span>סה״כ לתשלום</span><span id="sumGrand">₪0</span></div>
       </div>
       <div class="field full" id="allocationField" style="display:none;">
@@ -923,6 +925,10 @@
       <button class="icon-btn" id="closeSettings">✕</button>
     </div>
     <div class="modal-body" style="grid-template-columns:1fr;">
+      <div class="field full">
+        <label>שיעור מע״מ (%) <span style="font-weight:400; color:var(--muted);">— כל הסכומים באפליקציה מוזנים לפני מע״מ</span></label>
+        <input type="number" id="vatRateInput" min="0" max="100" step="0.1">
+      </div>
       <div class="field full">
         <label>כתובת ה-Web App (מהסקריפט בגיליון שלך)</label>
         <input type="url" id="webappUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
@@ -1189,7 +1195,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 4';
+const APP_VERSION = '2026.08.25 · 5';
 
 let orders = [];
 let editingId = null;
@@ -1222,10 +1228,31 @@ function daysUntil(d) {
 }
 function isPaid(order) { return order.payment && order.payment !== 'לא שולם'; }
 
-/* דמי משלוח וסה״כ */
+/* ---------------- מע״מ ----------------
+   כל הסכומים המוזנים באפליקציה הם *לפני* מע״מ.
+   המע״מ מחושב על סכום הביניים (מוצרים + משלוח) ומתווסף לסה״כ. */
+const VAT_KEY = 'fabricOrders.vatRate';
+
+function loadVatRate() {
+  try {
+    const v = localStorage.getItem(VAT_KEY);
+    return v === null ? 18 : (Number(v) || 0);
+  } catch (e) { return 18; }
+}
+function persistVatRate(r) {
+  try { localStorage.setItem(VAT_KEY, String(r)); } catch (e) { /* אחסון חסום */ }
+}
+let VAT_RATE = loadVatRate();
+
+/* דמי משלוח, סכומי ביניים וסה״כ */
 function orderShipping(o) { return Number(o.shippingCost) || 0; }
 function orderProducts(o) { return Number(o.amount) || 0; }
-function orderTotal(o) { return orderProducts(o) + orderShipping(o); }
+/* סכום ביניים — לפני מע״מ */
+function orderSubtotal(o) { return orderProducts(o) + orderShipping(o); }
+function orderVat(o) { return orderSubtotal(o) * (VAT_RATE / 100); }
+/* סה״כ לתשלום — כולל מע״מ. זהו הסכום שהלקוח משלם בפועל,
+   ולפיו נבדק גם הסף של מספר ההקצאה. */
+function orderTotal(o) { return orderSubtotal(o) + orderVat(o); }
 
 /* שלב ההזמנה: לא נשלח → נשלח ולא שולם → הושלם */
 function orderStage(o) {
@@ -1347,7 +1374,7 @@ function renderStats() {
 
   const stats = [
     { label: 'סה״כ הזמנות', value: total, color: 'var(--brand)', icon: '📦' },
-    { label: 'סכום כולל (עם משלוח)', value: fmtCurrency(totalAmount), color: 'var(--aqua)', icon: '₪' },
+    { label: 'סכום כולל (כולל מע״מ)', value: fmtCurrency(totalAmount), color: 'var(--aqua)', icon: '₪' },
     { label: 'טרם שולם', value: fmtCurrency(unpaidAmount), color: 'var(--critical)', icon: '⚠️' },
     { label: 'ממתין למשלוח', value: pendingDeliveries, color: 'var(--warning)', icon: '🚚' },
     { label: 'תזכורות השבוע', value: upcomingReminders, color: 'var(--brand)', icon: '⏰' },
@@ -1438,7 +1465,7 @@ function renderTable() {
         </td>
         <td data-label="סה״כ" class="amount">
           ${fmtCurrency(orderTotal(o))}
-          ${orderShipping(o) > 0 ? `<div class="sub" style="font-weight:400;">מוצרים ${fmtCurrency(orderProducts(o))} + משלוח ${fmtCurrency(orderShipping(o))}</div>` : ''}
+          <div class="sub" style="font-weight:400;">לפני מע״מ ${fmtCurrency(orderSubtotal(o))}${orderShipping(o) > 0 ? ` · משלוח ${fmtCurrency(orderShipping(o))}` : ''}${VAT_RATE > 0 ? ` · מע״מ ${fmtCurrency(orderVat(o))}` : ''}</div>
           ${orderTotal(o) > ALLOCATION_THRESHOLD ? `<div class="sub" style="font-weight:600; color:${o.allocationNumber ? 'var(--muted)' : 'var(--critical)'};">${o.allocationNumber ? 'הקצאה: ' + escapeHtml(o.allocationNumber) : '⚠️ חסר מס׳ הקצאה'}</div>` : ''}
         </td>
         <td data-label="תשלום">${paymentBadge}${checkInfo}</td>
@@ -1556,18 +1583,24 @@ function closeModal() { overlay.classList.remove('open'); editingId = null; }
 
 const ALLOCATION_THRESHOLD = 5900;
 
-/* קורא את סכומי הטופס: מוצרים, משלוח וסה״כ */
+/* קורא את סכומי הטופס. המוצרים והמשלוח הם לפני מע״מ. */
 function formTotals() {
   const products = Number(document.getElementById('f_amount').value) || 0;
   const shipping = Number(document.getElementById('f_shipping').value) || 0;
-  return { products, shipping, grand: products + shipping };
+  const subtotal = products + shipping;
+  const vat = subtotal * (VAT_RATE / 100);
+  return { products, shipping, subtotal, vat, grand: subtotal + vat };
 }
 
-/* מרענן את תיבת הסיכום ומחליט אם צריך מספר הקצאה (לפי הסה״כ, כולל משלוח) */
+/* מרענן את תיבת הסיכום ומחליט אם צריך מספר הקצאה.
+   הסף נבדק לפי הסה״כ *כולל מע״מ* — זו הדרישה של רשות המסים. */
 function toggleAllocationField() {
-  const { products, shipping, grand } = formTotals();
+  const { products, shipping, subtotal, vat, grand } = formTotals();
   document.getElementById('sumProducts').textContent = fmtCurrency(products);
   document.getElementById('sumShipping').textContent = fmtCurrency(shipping);
+  document.getElementById('sumSubtotal').textContent = fmtCurrency(subtotal);
+  document.getElementById('sumVatLabel').textContent = `מע״מ ${VAT_RATE.toLocaleString('he-IL')}%`;
+  document.getElementById('sumVat').textContent = fmtCurrency(vat);
   document.getElementById('sumGrand').textContent = fmtCurrency(grand);
   document.getElementById('allocationField').style.display = grand > ALLOCATION_THRESHOLD ? 'block' : 'none';
 }
@@ -1611,7 +1644,7 @@ document.getElementById('saveOrder').addEventListener('click', () => {
   const { products: amountVal, shipping: shippingVal, grand: grandVal } = formTotals();
   const allocationNumber = document.getElementById('f_allocation').value.trim();
   if (grandVal > ALLOCATION_THRESHOLD && !allocationNumber) {
-    showToast(`סה״כ מעל ${ALLOCATION_THRESHOLD.toLocaleString('he-IL')} ₪ — חובה להזין מספר הקצאה`);
+    showToast(`סה״כ כולל מע״מ מעל ${ALLOCATION_THRESHOLD.toLocaleString('he-IL')} ₪ — חובה להזין מספר הקצאה`);
     document.getElementById('f_allocation').focus();
     return;
   }
@@ -1695,9 +1728,11 @@ themeToggle.addEventListener('click', () => {
 
 /* ---------------- export ---------------- */
 document.getElementById('exportBtn').addEventListener('click', () => {
-  const headers = ['שם הלקוח','טלפון','כתובת','אימייל','כמות','מחיר ליחידה','סכום לתשלום','דמי משלוח','סה״כ לתשלום','מספר הקצאה','שיטת תשלום(מזומן/העברה/צק/לא שולם)','תאריך פרעון הצ׳ק','פרטי הצ׳ק','סטטוס משלוח (נשלח/לא נשלח)','תאריך משלוח','תאריך תזכורת ','הערות','שלב'];
+  const headers = ['שם הלקוח','טלפון','כתובת','אימייל','כמות','מחיר ליחידה','סכום לתשלום','דמי משלוח','סכום ביניים (לפני מע״מ)',`מע״מ ${VAT_RATE}%`,'סה״כ לתשלום','מספר הקצאה','שיטת תשלום(מזומן/העברה/צק/לא שולם)','תאריך פרעון הצ׳ק','פרטי הצ׳ק','סטטוס משלוח (נשלח/לא נשלח)','תאריך משלוח','תאריך תזכורת ','הערות','שלב'];
   const rows = orders.map(o => [
-    o.name, o.phone, o.address, o.email, o.qty, o.unitPrice, o.amount, orderShipping(o), orderTotal(o), o.allocationNumber, o.payment, o.checkDueDate, o.checkDetails, o.deliveryStatus, o.deliveryDate, o.reminderDate, o.notes, STAGE_LABEL[orderStage(o)]
+    o.name, o.phone, o.address, o.email, o.qty, o.unitPrice, o.amount, orderShipping(o),
+    orderSubtotal(o), Math.round(orderVat(o) * 100) / 100, Math.round(orderTotal(o) * 100) / 100,
+    o.allocationNumber, o.payment, o.checkDueDate, o.checkDetails, o.deliveryStatus, o.deliveryDate, o.reminderDate, o.notes, STAGE_LABEL[orderStage(o)]
   ]);
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
@@ -1885,6 +1920,8 @@ const HEADER_MAP = {
   'מחיר ליחידה': 'unitPrice',
   'סכום לתשלום': 'amount',
   'דמי משלוח': 'shippingCost',
+  'סכום ביניים (לפני מע״מ)': 'subtotalAmount',
+  'מע״מ': 'vatAmount',
   'סה״כ לתשלום': 'totalAmount',
   'מספר הקצאה': 'allocationNumber',
   'שיטת תשלום(מזומן/העברה/צק/לא שולם)': 'payment',
@@ -1977,9 +2014,13 @@ async function loadFromSheet(silent) {
 async function saveToSheet() {
   if (!WEBAPP_URL) return;
   setSyncStatus('syncing', 'שומר בגיליון...');
-  const rows = orders.map(o => SHEET_HEADERS.map(h =>
-    h === 'סה״כ לתשלום' ? orderTotal(o) : (o[HEADER_MAP[h]] ?? '')
-  ));
+  /* שלוש העמודות האלה מחושבות ואינן נשמרות במודל ההזמנה */
+  const rows = orders.map(o => SHEET_HEADERS.map(h => {
+    if (h === 'סכום ביניים (לפני מע״מ)') return Math.round(orderSubtotal(o) * 100) / 100;
+    if (h === 'מע״מ') return Math.round(orderVat(o) * 100) / 100;
+    if (h === 'סה״כ לתשלום') return Math.round(orderTotal(o) * 100) / 100;
+    return o[HEADER_MAP[h]] ?? '';
+  }));
   try {
     const json = await callSheet('save', { headers: SHEET_HEADERS, rows });
     if (handleAuthError(json)) { setSyncStatus('error', 'אין הרשאה'); return; }
@@ -1995,6 +2036,7 @@ async function saveToSheet() {
 
 document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('webappUrlInput').value = WEBAPP_URL;
+  document.getElementById('vatRateInput').value = VAT_RATE;
   document.getElementById('versionLine').textContent = 'גרסה ' + APP_VERSION;
   settingsOverlay.classList.add('open');
 });
@@ -2030,6 +2072,15 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
 
 document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
   const url = document.getElementById('webappUrlInput').value.trim();
+
+  /* שיעור המע״מ משפיע על כל החישובים — נשמר ומרונדר מיד */
+  const rate = Number(document.getElementById('vatRateInput').value);
+  if (!isNaN(rate) && rate >= 0 && rate <= 100 && rate !== VAT_RATE) {
+    VAT_RATE = rate;
+    persistVatRate(rate);
+    render();
+  }
+
   WEBAPP_URL = url;
   persistUrl(url);
   settingsOverlay.classList.remove('open');
@@ -2100,6 +2151,8 @@ function reportData() {
     revenue: paid.reduce((s, o) => s + orderTotal(o), 0),
     debt: unpaid.reduce((s, o) => s + orderTotal(o), 0),
     shipping: orders.reduce((s, o) => s + orderShipping(o), 0),
+    subtotal: orders.reduce((s, o) => s + orderSubtotal(o), 0),
+    vat: orders.reduce((s, o) => s + orderVat(o), 0),
     grand,
     avg: orders.length ? Math.round(grand / orders.length) : 0,
     monthSum: monthOrders.reduce((s, o) => s + orderTotal(o), 0),
@@ -2148,9 +2201,9 @@ function renderReports() {
         <div class="note">מתוך ${orders.length} הזמנות</div>
       </div>
       <div class="rep-card">
-        <div class="k">🚚 סה״כ דמי משלוח</div>
-        <div class="v" style="color:var(--aqua)">${fmtCurrency(d.shipping)}</div>
-        <div class="note">מתוך סה״כ ${fmtCurrency(d.grand)}</div>
+        <div class="k">🧾 מע״מ ${VAT_RATE.toLocaleString('he-IL')}%</div>
+        <div class="v" style="color:var(--aqua)">${fmtCurrency(d.vat)}</div>
+        <div class="note">על ${fmtCurrency(d.subtotal)} לפני מע״מ · משלוח ${fmtCurrency(d.shipping)}</div>
       </div>
       <div class="rep-card">
         <div class="k">🔔 דורש טיפול</div>
@@ -2196,10 +2249,12 @@ document.getElementById('exportReportBtn').addEventListener('click', () => {
     ['הופק בתאריך', new Date().toLocaleDateString('he-IL')],
     [],
     ['מדד', 'ערך'],
-    ['הכנסות (שולם)', d.revenue],
-    ['חוב פתוח', d.debt],
+    ['הכנסות (שולם, כולל מע״מ)', d.revenue],
+    ['חוב פתוח (כולל מע״מ)', d.debt],
     ['סה״כ דמי משלוח', d.shipping],
-    ['סה״כ כללי', d.grand],
+    ['סכום ביניים (לפני מע״מ)', d.subtotal],
+    [`מע״מ ${VAT_RATE}%`, d.vat],
+    ['סה״כ כללי (כולל מע״מ)', d.grand],
     ['ממוצע להזמנה', d.avg],
     ['הזמנות החודש', d.monthCount],
     ['סכום החודש', d.monthSum],
@@ -2228,7 +2283,7 @@ const QUOTE_DEFAULTS = {
   kosher: 'ללא סיליקון, בהמלצת בודקות טהרה ובהוראת גדולי הדור שליט"א.\nבהכשר הבד"ץ העדה החרדית.\nהבדים מיוצרים בחסות ובפיקוח המרכז הארצי למען טהרת המשפחה בישראל.',
   type: 'בדי בדיקה סוג א׳ א׳',
   item: 'בדי בדיקה סוג א׳ א׳',
-  vat: 18,
+  vat: VAT_RATE,
   note: 'ההצעה בתוקף ל-30 יום ממועד הוצאתה.',
   contact: 'שרה לוי',
   phone: '054-4896587',
@@ -2523,7 +2578,7 @@ function openCustomer(name) {
       <div class="rep-card">
         <div class="k">💵 סה״כ רכישות</div>
         <div class="v">${fmtCurrency(total)}</div>
-        ${shipping ? `<div class="note">מתוכם ${fmtCurrency(shipping)} דמי משלוח</div>` : ''}
+        <div class="note">כולל מע״מ${shipping ? ` · מתוכם ${fmtCurrency(shipping)} משלוח` : ''}</div>
       </div>
       <div class="rep-card">
         <div class="k">⚠️ חוב פתוח</div>
