@@ -499,8 +499,8 @@
   /* פסי הגרפיקה מהמיתוג */
   .qs-band { position: absolute; inset-inline: 0; width: 100%; display: block; }
   /* הפס העליון מתחיל מתחת לגוש המיתוג, כדי שהטקסט לא יישב על הגרפיקה */
-  .qs-band-top { top: 25mm; height: 32mm; object-fit: cover; object-position: center 62%; }
-  .qs-band-bottom { bottom: 0; height: 34mm; object-fit: cover; object-position: center 38%; }
+  .qs-band-top { top: 25mm; height: 30mm; object-fit: cover; object-position: center 62%; }
+  .qs-band-bottom { bottom: 0; height: 30mm; object-fit: cover; object-position: center 38%; }
 
   .qs-brand { position: absolute; top: 6mm; inset-inline: 0; text-align: center; }
   .qs-logo {
@@ -519,7 +519,7 @@
   }
 
   .qs-content {
-    position: absolute; top: 61mm; bottom: 36mm; right: 14mm; left: 14mm;
+    position: absolute; top: 57mm; bottom: 31mm; right: 14mm; left: 14mm;
     display: flex; flex-direction: column;
   }
   /* בלי זה הדפדפן מכווץ את הפריטים כשאין מקום: הטקסט נדחס והחריגה
@@ -531,11 +531,11 @@
   .qs-top .dates { color: #5a5a5a; font-size: 10.5pt; }
   .qs-top .dates span + span::before { content: '·'; margin: 0 7px; color: var(--q-rose); }
 
-  .qs-to { margin-top: 10pt; font-size: 12pt; line-height: 1.5; }
+  .qs-to { margin-top: 22pt; font-size: 12pt; line-height: 1.5; }
   .qs-to .lbl { color: #6a6a6a; }
   .qs-to .who { font-weight: 700; font-size: 13.5pt; }
 
-  .qs-title { text-align: center; margin: 17pt 0 10pt; }
+  .qs-title { text-align: center; margin: 28pt 0 11pt; }
   .qs-title h2 {
     display: inline-block; margin: 0; padding: 0 14pt 4pt;
     font-size: 16pt; font-weight: 900; color: var(--q-blue);
@@ -544,7 +544,7 @@
 
   .qs-intro { font-size: 11.5pt; line-height: 1.7; margin: 0 0 9pt; text-align: justify; }
 
-  .qs-sec { margin-bottom: 9pt; }
+  .qs-sec { margin-bottom: 7pt; }
   .qs-sec h3 {
     margin: 0 0 5pt; font-size: 12.5pt; font-weight: 700; color: var(--q-blue);
     display: flex; align-items: center; gap: 7pt;
@@ -563,7 +563,7 @@
   }
 
   /* הטבלה עטופה ב-div: פריט flex ישיר עובר blockification והפריסה נשברת */
-  .qs-table-wrap { margin: 3pt 0 7pt; }
+  .qs-table-wrap { margin: 2pt 0 5pt; }
   .qs-table { width: 100%; border-collapse: collapse; font-size: 11.5pt; }
   .qs-table thead th {
     background: var(--q-blue); color: #fff; font-weight: 700; font-size: 11pt;
@@ -1229,7 +1229,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 9';
+const APP_VERSION = '2026.08.25 · 10';
 
 let orders = [];
 let editingId = null;
