@@ -563,19 +563,30 @@
   .qs-table { width: 100%; border-collapse: collapse; font-size: 11.5pt; }
   .qs-table thead th {
     background: var(--q-blue); color: #fff; font-weight: 700; font-size: 11pt;
-    padding: 6pt 9pt; text-align: right; border: none;
+    padding: 7pt 10pt; text-align: center; border: none; letter-spacing: .01em;
   }
-  .qs-table thead th:last-child, .qs-table td:last-child { text-align: left; }
-  .qs-table tbody td { padding: 4.5pt 9pt; border-bottom: 1px solid #e3e7f2; }
-  .qs-table tbody tr:nth-child(even) td { background: #f7f9fd; }
-  .qs-table .num { font-variant-numeric: tabular-nums; }
-  /* שורות המע״מ — משניות, בלי להתחרות בשורת הסה״כ */
-  .qs-table tbody tr.vat td { background: #fafbfe; color: #5c5c5c; font-size: 10.5pt; }
-  .qs-table tbody tr.vat.first td { border-top: 1px solid #d7ddec; }
+  .qs-table thead th:first-child { text-align: right; }
+  .qs-table thead th:last-child { text-align: left; }
+
+  .qs-table tbody td {
+    padding: 7pt 10pt; border-bottom: 1px solid #e3e7f2;
+    text-align: center; vertical-align: middle;
+  }
+  .qs-table tbody td:first-child { text-align: right; font-weight: 500; }
+  .qs-table tbody td:last-child { text-align: left; font-weight: 700; }
+  .qs-table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* שורות הסיכום — התווית צמודה לסכום ולא נדחקת לקצה הנגדי */
+  .qs-table tbody tr.vat td { background: #f7f9fd; color: #4a4a4a; font-size: 11pt; }
+  .qs-table tbody tr.vat td:first-child { text-align: left; padding-inline-end: 0; font-weight: 500; }
+  .qs-table tbody tr.vat.first td { border-top: 1.5px solid #c8d1e6; }
+
   .qs-table tfoot td {
-    padding: 8pt 9pt; background: var(--q-tint); color: var(--q-deep);
-    font-weight: 900; font-size: 13pt; border-top: 2px solid var(--q-rose);
+    padding: 9pt 10pt; background: var(--q-tint); color: var(--q-deep);
+    font-weight: 900; font-size: 13.5pt; border-top: 2.5px solid var(--q-rose);
   }
+  .qs-table tfoot td:first-child { text-align: left; padding-inline-end: 0; }
+  .qs-table tfoot td:last-child { text-align: left; }
 
   .qs-note {
     font-size: 10pt; color: #6a6a6a; line-height: 1.6; margin: 0;
@@ -609,7 +620,8 @@
       overflow: visible !important; animation: none !important; background: none !important;
     }
     #quoteOverlay .modal::before { display: none !important; }
-    #quoteOverlay .modal-head, #quoteOverlay .modal-foot, #quoteOverlay .quote-form { display: none !important; }
+    #quoteOverlay .modal-head, #quoteOverlay .modal-foot,
+    #quoteOverlay .quote-form, #quoteOverlay .install-note { display: none !important; }
     #quoteOverlay .modal-body {
       display: block !important; padding: 0 !important; margin: 0 !important; gap: 0 !important;
     }
@@ -621,10 +633,10 @@
     }
     .quote-scaler { transform: none !important; display: block !important; margin: 0 !important; }
 
-    /* גובה מעט קטן מגיליון A4 מלא: 297 מ״מ מדויקים גולשים לעמוד שני
-       בגלל עיגול פיקסלים בדפדפן. */
+    /* גובה קטן מ-A4 מלא. 297 מ״מ מדויקים גולשים לעמוד שני בגלל עיגול
+       פיקסלים, ופיירפוקס מוסיף שוליים משלו — לכן מרווח ביטחון גדול יותר. */
     .quote-sheet {
-      width: 210mm !important; height: 296mm !important;
+      width: 210mm !important; height: 292mm !important;
       margin: 0 !important; box-shadow: none !important; overflow: hidden !important;
       break-inside: avoid; page-break-inside: avoid;
       break-after: avoid; page-break-after: avoid;
@@ -1045,6 +1057,13 @@
         </div>
       </div>
 
+      <p class="install-note" style="background:var(--warning-tint); border-radius:10px; padding:11px 13px; margin:0 0 12px;">
+        <strong>🖨️ לפני ההדפסה — שתי הגדרות בחלון ההדפסה:</strong><br>
+        <strong>שוליים / Margins</strong> ← בחר <strong>ללא / None</strong>&nbsp; · &nbsp;
+        <strong>גודל נייר / Paper</strong> ← <strong>A4</strong><br>
+        <span style="color:var(--muted);">בלי זה הדפדפן מוסיף שוליים משלו, והדף נחתך לשני עמודים.</span>
+      </p>
+
       <div class="quote-preview-wrap" id="quotePreviewWrap">
         <div class="quote-scaler" id="quoteScaler">
           <div class="quote-sheet" id="quoteSheet">
@@ -1076,6 +1095,10 @@
               </div>
               <div class="qs-table-wrap">
                 <table class="qs-table">
+                  <colgroup>
+                    <col style="width:43%"><col style="width:13%">
+                    <col style="width:20%"><col style="width:24%">
+                  </colgroup>
                   <thead>
                     <tr><th>פריט</th><th>כמות</th><th>מחיר ליח׳</th><th>סכום</th></tr>
                   </thead>
@@ -1195,7 +1218,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 6';
+const APP_VERSION = '2026.08.25 · 7';
 
 let orders = [];
 let editingId = null;
@@ -2405,7 +2428,8 @@ function renderQuote() {
       <td class="num">${fmtQ(amount)}</td>
     </tr>`;
   if (ship > 0) {
-    rows += `<tr><td colspan="3">דמי משלוח</td><td class="num">${fmtQ(ship)}</td></tr>`;
+    /* דמי משלוח הם שורת פריט — לכן בעמודת הפריט ולא בטווח מאוחד */
+    rows += `<tr><td>דמי משלוח</td><td></td><td></td><td class="num">${fmtQ(ship)}</td></tr>`;
   }
   /* סכום ביניים מוצג רק כשיש יותר משורה אחת לסכם */
   if (ship > 0 || rate > 0) {
