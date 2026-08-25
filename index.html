@@ -1286,7 +1286,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 17';
+const APP_VERSION = '2026.08.25 · 18';
 
 let orders = [];
 let editingId = null;
@@ -2873,14 +2873,16 @@ function renderQuotesHistory() {
   const note = document.getElementById('archiveNote');
   if (!body) return;
 
-  note.textContent = savedQuotes.length
-    ? (quotesSheetOk ? `${savedQuotes.length} הצעות · מסונכרן לגיליון` : `${savedQuotes.length} הצעות · במכשיר הזה בלבד`)
-    : '';
+  /* הסטטוס מוצג תמיד, גם כשהארכיון ריק — דווקא אז צריך לדעת
+     אם הסנכרון לגיליון פעיל */
+  const sync = !WEBAPP_URL ? '' : (quotesSheetOk ? '✅ מסונכרן לגיליון' : '⚠️ במכשיר הזה בלבד');
+  note.textContent = savedQuotes.length ? `${savedQuotes.length} הצעות · ${sync}` : sync;
 
   if (!savedQuotes.length) {
     body.innerHTML = `<div class="rep-empty" style="text-align:center; padding:26px 0;">
         עדיין לא נשמרו הצעות.<br>
         <span class="sub">כל הצעה שתשמור, תדפיס או תשלח בוואטסאפ תופיע כאן.</span>
+        ${sync ? `<div class="sub" style="margin-top:14px;">${sync}</div>` : ''}
       </div>`;
     return;
   }
