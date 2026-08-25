@@ -1016,16 +1016,9 @@
             <label>דמי משלוח (₪)</label>
             <input type="number" id="q_ship" min="0" step="0.5">
           </div>
-          <div class="field">
-            <label>שיעור מע״מ (%)</label>
+          <div class="field full">
+            <label>שיעור מע״מ (%) <span style="font-weight:400; color:var(--muted);">— הסכומים למעלה הם לפני מע״מ, והמע״מ מתווסף בתחתית הטבלה</span></label>
             <input type="number" id="q_vat" min="0" max="100" step="0.1">
-          </div>
-          <div class="field">
-            <label>הסכומים שהוזנו</label>
-            <select id="q_vatmode">
-              <option value="incl">כוללים מע״מ</option>
-              <option value="excl">לפני מע״מ</option>
-            </select>
           </div>
           <div class="field full">
             <label>הערת סיום</label>
@@ -1078,7 +1071,7 @@
               <div class="qs-table-wrap">
                 <table class="qs-table">
                   <thead>
-                    <tr><th>פריט</th><th>כמות</th><th>מחיר ליח׳</th><th>סה״כ</th></tr>
+                    <tr><th>פריט</th><th>כמות</th><th>מחיר ליח׳</th><th>סכום</th></tr>
                   </thead>
                   <tbody id="qsRows"></tbody>
                   <tfoot>
@@ -1196,7 +1189,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 3';
+const APP_VERSION = '2026.08.25 · 4';
 
 let orders = [];
 let editingId = null;
@@ -2236,7 +2229,6 @@ const QUOTE_DEFAULTS = {
   type: 'בדי בדיקה סוג א׳ א׳',
   item: 'בדי בדיקה סוג א׳ א׳',
   vat: 18,
-  vatmode: 'incl',
   note: 'ההצעה בתוקף ל-30 יום ממועד הוצאתה.',
   contact: 'שרה לוי',
   phone: '054-4896587',
@@ -2303,7 +2295,7 @@ function hebrewDate(d) {
 const QUOTE_FIELDS = {
   q_to: 'to', q_subject: 'subject', q_intro: 'intro', q_product: 'product',
   q_kosher: 'kosher', q_type: 'type', q_item: 'item', q_qty: 'qty', q_unit: 'unit',
-  q_amount: 'amount', q_ship: 'ship', q_vat: 'vat', q_vatmode: 'vatmode',
+  q_amount: 'amount', q_ship: 'ship', q_vat: 'vat',
   q_note: 'note', q_contact: 'contact', q_phone: 'phone', q_footer: 'footer',
 };
 
@@ -2339,23 +2331,14 @@ function renderQuote() {
   const amount = Number(v.amount) || 0;
   const ship = Number(v.ship) || 0;
   const rate = (Number(v.vat) || 0) / 100;
-  const base = amount + ship;
 
-  /* הסכומים שהוזנו כוללים מע״מ או לא — משנה את כיוון החישוב */
-  let preVat, vat, grand;
-  if (v.vatmode === 'excl') {
-    preVat = base;
-    vat = base * rate;
-    grand = base + vat;
-  } else {
-    grand = base;
-    preVat = rate > 0 ? base / (1 + rate) : base;
-    vat = grand - preVat;
-  }
+  /* הסכומים שמוזנים הם תמיד לפני מע״מ. המע״מ מתווסף על סכום הביניים. */
+  const subtotal = amount + ship;
+  const vat = subtotal * rate;
+  const grand = subtotal + vat;
 
-  const suffix = v.vatmode === 'excl' ? ' <span style="font-size:9pt;color:#7a7a7a;">(לפני מע״מ)</span>' : '';
   let rows = `<tr>
-      <td>${escapeHtml(v.item || '')}${suffix}</td>
+      <td>${escapeHtml(v.item || '')}</td>
       <td class="num">${qty ? qty.toLocaleString('he-IL') : '—'}</td>
       <td class="num">${unit ? fmtQ(unit) : '—'}</td>
       <td class="num">${fmtQ(amount)}</td>
@@ -2363,8 +2346,11 @@ function renderQuote() {
   if (ship > 0) {
     rows += `<tr><td colspan="3">דמי משלוח</td><td class="num">${fmtQ(ship)}</td></tr>`;
   }
+  /* סכום ביניים מוצג רק כשיש יותר משורה אחת לסכם */
+  if (ship > 0 || rate > 0) {
+    rows += `<tr class="vat first"><td colspan="3">סכום ביניים <span style="font-size:9pt;">(לפני מע״מ)</span></td><td class="num">${fmtQ(subtotal)}</td></tr>`;
+  }
   if (rate > 0) {
-    rows += `<tr class="vat first"><td colspan="3">סכום לפני מע״מ</td><td class="num">${fmtQ(preVat)}</td></tr>`;
     rows += `<tr class="vat"><td colspan="3">מע״מ ${(rate * 100).toLocaleString('he-IL')}%</td><td class="num">${fmtQ(vat)}</td></tr>`;
   }
 
@@ -2419,7 +2405,6 @@ function openQuote(orderId) {
   document.getElementById('q_amount').value = o ? orderProducts(o) : '';
   document.getElementById('q_ship').value = o ? orderShipping(o) : '';
   document.getElementById('q_vat').value = p.vat;
-  document.getElementById('q_vatmode').value = p.vatmode;
   document.getElementById('q_note').value = p.note;
   document.getElementById('q_contact').value = p.contact;
   document.getElementById('q_phone').value = p.phone;
@@ -2447,7 +2432,7 @@ Object.keys(QUOTE_FIELDS).forEach(id => {
     const v = readQuoteForm();
     saveQuotePrefs({
       subject: v.subject, intro: v.intro, product: v.product, kosher: v.kosher,
-      type: v.type, item: v.item, vat: v.vat, vatmode: v.vatmode,
+      type: v.type, item: v.item, vat: v.vat,
       note: v.note, contact: v.contact, phone: v.phone, footer: v.footer,
     });
   }));
@@ -2474,7 +2459,6 @@ document.getElementById('quoteResetBtn').addEventListener('click', () => {
   document.getElementById('q_type').value = p.type;
   document.getElementById('q_item').value = p.item;
   document.getElementById('q_vat').value = p.vat;
-  document.getElementById('q_vatmode').value = p.vatmode;
   document.getElementById('q_note').value = p.note;
   document.getElementById('q_contact').value = p.contact;
   document.getElementById('q_phone').value = p.phone;
