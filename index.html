@@ -1245,7 +1245,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 15';
+const APP_VERSION = '2026.08.25 · 16';
 
 let orders = [];
 let editingId = null;
@@ -1689,8 +1689,10 @@ function recalcAmountFromUnits() {
 function backCalcFromTarget() {
   const target = Number(document.getElementById('f_target').value) || 0;
   if (target <= 0) return false;
+  /* ארבע ספרות ולא שתיים: עיגול לאגורות כאן מחזיר שארית שמתגלגלת
+     למע״מ ומקפיצה את הסה״כ באגורה (6,000 → 6,000.01). */
   const products = target / (1 + VAT_RATE / 100);
-  document.getElementById('f_amount').value = Math.round(products * 100) / 100;
+  document.getElementById('f_amount').value = Math.round(products * 10000) / 10000;
   const qty = Number(document.getElementById('f_qty').value) || 0;
   if (qty > 0) {
     document.getElementById('f_unit_price').value = Math.round((products / qty) * 100) / 100;
@@ -2516,9 +2518,11 @@ function checkQuoteFit() {
   warn.style.display = over ? 'inline' : 'none';
 }
 
-/* סכום בפורמט מסמך: ללא עיגול אגורות מיותר */
+/* סכום בפורמט מסמך. סכום שקרוב לשקל שלם מוצג בלי אגורות —
+   אחרת שאריות חישוב זעירות היו מציגות "6,000.00" במקום "6,000". */
 function fmtQ(n) {
   n = Number(n) || 0;
+  if (Math.abs(n - Math.round(n)) < 0.005) n = Math.round(n);
   const s = Number.isInteger(n) ? n.toLocaleString('he-IL')
     : n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return s + ' ₪';
@@ -2610,7 +2614,7 @@ function backCalcQuote() {
   const rate = (Number(document.getElementById('q_vat').value) || 0) / 100;
   /* המשלוח אינו נכנס לחישוב — הוא פריט נפרד שכבר כולל מע״מ */
   const products = target / (1 + rate);
-  document.getElementById('q_amount').value = Math.round(products * 100) / 100;
+  document.getElementById('q_amount').value = Math.round(products * 10000) / 10000;
   const qty = Number(document.getElementById('q_qty').value) || 0;
   if (qty > 0) {
     document.getElementById('q_unit').value = Math.round((products / qty) * 100) / 100;
