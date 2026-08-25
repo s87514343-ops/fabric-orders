@@ -1195,7 +1195,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 5';
+const APP_VERSION = '2026.08.25 · 6';
 
 let orders = [];
 let editingId = null;
@@ -2293,7 +2293,13 @@ const QUOTE_DEFAULTS = {
 function loadQuotePrefs() {
   try {
     const raw = localStorage.getItem(QUOTE_PREFS_KEY);
-    return raw ? Object.assign({}, QUOTE_DEFAULTS, JSON.parse(raw)) : Object.assign({}, QUOTE_DEFAULTS);
+    const p = raw ? Object.assign({}, QUOTE_DEFAULTS, JSON.parse(raw)) : Object.assign({}, QUOTE_DEFAULTS);
+    /* נוסח מגרסה שבה המחירים כללו מע״מ. כעת המע״מ מוצג בשורה נפרדת,
+       והמשפט הזה סותר את הטבלה — לכן הוא מוסר מנוסח שנשמר בעבר. */
+    if (typeof p.note === 'string' && /המחירים כוללים מע/.test(p.note)) {
+      p.note = p.note.replace(/\s*המחירים כוללים מע["״]?מ\.?/g, '').trim();
+    }
+    return p;
   } catch (e) { return Object.assign({}, QUOTE_DEFAULTS); }
 }
 function saveQuotePrefs(p) {
@@ -2473,6 +2479,17 @@ function openQuote(orderId) {
 function openQuoteFromOrder(id) { openQuote(id); }
 function closeQuote() { quoteOverlay.classList.remove('open'); }
 
+/* כמות × מחיר ליחידה ממלאים את סכום המוצרים, כמו בחלון ההזמנה.
+   נרשם אחרי המאזין הכללי כדי שהתצוגה תרונדר מחדש עם הסכום המעודכן. */
+function recalcQuoteAmount() {
+  const qty = Number(document.getElementById('q_qty').value) || 0;
+  const unit = Number(document.getElementById('q_unit').value) || 0;
+  if (qty > 0 && unit > 0) {
+    document.getElementById('q_amount').value = Math.round(qty * unit * 100) / 100;
+    renderQuote();
+  }
+}
+
 /* בחירת סוג הבד ממלאת את שם הפריט; "אחר" משאירה אותו לעריכה חופשית */
 document.getElementById('q_type').addEventListener('change', (e) => {
   if (e.target.value) document.getElementById('q_item').value = e.target.value;
@@ -2492,6 +2509,9 @@ Object.keys(QUOTE_FIELDS).forEach(id => {
     });
   }));
 });
+
+document.getElementById('q_qty').addEventListener('input', recalcQuoteAmount);
+document.getElementById('q_unit').addEventListener('input', recalcQuoteAmount);
 
 document.getElementById('closeQuote').addEventListener('click', closeQuote);
 quoteOverlay.addEventListener('click', (e) => { if (e.target === quoteOverlay) closeQuote(); });
