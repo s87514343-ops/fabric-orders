@@ -498,18 +498,19 @@
   }
   /* פסי הגרפיקה מהמיתוג */
   .qs-band { position: absolute; inset-inline: 0; width: 100%; display: block; }
-  .qs-band-top { top: 18mm; height: 34mm; object-fit: cover; object-position: center 62%; }
-  .qs-band-bottom { bottom: 0; height: 38mm; object-fit: cover; object-position: center 38%; }
+  /* הפס העליון מתחיל מתחת לגוש המיתוג, כדי שהטקסט לא יישב על הגרפיקה */
+  .qs-band-top { top: 25mm; height: 32mm; object-fit: cover; object-position: center 62%; }
+  .qs-band-bottom { bottom: 0; height: 34mm; object-fit: cover; object-position: center 38%; }
 
-  .qs-brand { position: absolute; top: 5mm; inset-inline: 0; text-align: center; }
+  .qs-brand { position: absolute; top: 6mm; inset-inline: 0; text-align: center; }
   .qs-logo {
-    font-family: 'Rubik', sans-serif; font-weight: 800; font-size: 30pt; line-height: 1;
+    font-family: 'Rubik', sans-serif; font-weight: 800; font-size: 27pt; line-height: 1;
     color: var(--q-blue); letter-spacing: .04em;
     text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 2px 4px rgba(85,91,137,.28);
   }
   .qs-tagline {
-    font-family: 'Rubik', sans-serif; font-size: 9.5pt; font-weight: 500;
-    color: var(--q-deep); margin-top: 2mm; letter-spacing: .01em;
+    font-family: 'Rubik', sans-serif; font-size: 9pt; font-weight: 500;
+    color: var(--q-deep); margin-top: 1.5mm; letter-spacing: .01em;
   }
   .qs-contact {
     position: absolute; bottom: 6mm; inset-inline: 12mm; text-align: center;
@@ -518,9 +519,12 @@
   }
 
   .qs-content {
-    position: absolute; top: 58mm; bottom: 43mm; right: 14mm; left: 14mm;
+    position: absolute; top: 61mm; bottom: 36mm; right: 14mm; left: 14mm;
     display: flex; flex-direction: column;
   }
+  /* בלי זה הדפדפן מכווץ את הפריטים כשאין מקום: הטקסט נדחס והחריגה
+     נעלמת, כך שאי אפשר גם לזהות אותה. עדיף שתהיה גלויה ותתריע. */
+  .qs-content > * { flex-shrink: 0; }
 
   .qs-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5pt; }
   .qs-top .bsd { font-weight: 700; }
@@ -626,17 +630,24 @@
       display: block !important; padding: 0 !important; margin: 0 !important; gap: 0 !important;
     }
 
+    /* הדפדפן מדפיס בתוך שוליים משלו, שהמשתמש לא תמיד מבטל. במקום
+       להסתמך על ההגדרה שלו, הגיליון מוקטן ל-87.6% כך שייכנס גם
+       בשוליים ברירת מחדל של כרום ושל פיירפוקס.
+       הקטנה ב-transform אינה משנה את גובה התיבה לצורך חלוקה לעמודים,
+       ולכן הגובה נקבע במפורש על העוטף. */
     .quote-preview-wrap {
       border: none !important; background: none !important; padding: 0 !important;
-      margin: 0 !important; overflow: visible !important; height: auto !important;
-      display: block !important; font-size: 0 !important; line-height: 0 !important;
+      margin: 0 !important; display: block !important;
+      font-size: 0 !important; line-height: 0 !important;
+      height: 261mm !important; overflow: hidden !important;
     }
-    .quote-scaler { transform: none !important; display: block !important; margin: 0 !important; }
+    .quote-scaler {
+      display: block !important; width: 210mm !important; margin: 0 auto !important;
+      transform: scale(0.876) !important; transform-origin: top center !important;
+    }
 
-    /* גובה קטן מ-A4 מלא. 297 מ״מ מדויקים גולשים לעמוד שני בגלל עיגול
-       פיקסלים, ופיירפוקס מוסיף שוליים משלו — לכן מרווח ביטחון גדול יותר. */
     .quote-sheet {
-      width: 210mm !important; height: 292mm !important;
+      width: 210mm !important; height: 297mm !important;
       margin: 0 !important; box-shadow: none !important; overflow: hidden !important;
       break-inside: avoid; page-break-inside: avoid;
       break-after: avoid; page-break-after: avoid;
@@ -1057,11 +1068,9 @@
         </div>
       </div>
 
-      <p class="install-note" style="background:var(--warning-tint); border-radius:10px; padding:11px 13px; margin:0 0 12px;">
-        <strong>🖨️ לפני ההדפסה — שתי הגדרות בחלון ההדפסה:</strong><br>
-        <strong>שוליים / Margins</strong> ← בחר <strong>ללא / None</strong>&nbsp; · &nbsp;
-        <strong>גודל נייר / Paper</strong> ← <strong>A4</strong><br>
-        <span style="color:var(--muted);">בלי זה הדפדפן מוסיף שוליים משלו, והדף נחתך לשני עמודים.</span>
+      <p class="install-note" style="background:var(--brand-tint); border-radius:10px; padding:10px 13px; margin:0 0 12px;">
+        🖨️ בחלון ההדפסה בחר יעד <strong>שמירה כ-PDF</strong> וגודל נייר <strong>A4</strong>.
+        <span style="color:var(--muted);">הדף מותאם להיכנס לעמוד אחד בכל הגדרת שוליים.</span>
       </p>
 
       <div class="quote-preview-wrap" id="quotePreviewWrap">
@@ -1218,7 +1227,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 7';
+const APP_VERSION = '2026.08.25 · 8';
 
 let orders = [];
 let editingId = null;
@@ -2442,16 +2451,21 @@ function renderQuote() {
   document.getElementById('qsRows').innerHTML = rows;
   document.getElementById('qsGrand').textContent = fmtQ(grand);
 
-  requestAnimationFrame(checkQuoteFit);
+  /* setTimeout ולא requestAnimationFrame: rAF אינו נורה כשהדף אינו מצויר
+     (טאב מוסתר, חלון ממוזער), והבדיקה הייתה נדלגת. */
+  clearTimeout(fitCheckTimer);
+  fitCheckTimer = setTimeout(checkQuoteFit, 0);
 }
+let fitCheckTimer;
 
-/* מזהיר כשהתוכן גולש מגבולות העמוד — עדיף להודיע מאשר להפיק PDF חתוך */
+/* מזהיר כשהתוכן גולש מגבולות העמוד — עדיף להודיע מאשר להפיק PDF חתוך.
+   ההשוואה היא scrollHeight מול clientHeight, ולא מיקום החתימה: החתימה
+   מוצמדת לתחתית ב-margin-top:auto ולכן אינה מעידה על חריגה. */
 function checkQuoteFit() {
   const content = document.querySelector('.qs-content');
-  const sign = content && content.querySelector('.qs-sign');
   const warn = document.getElementById('quoteFitWarn');
-  if (!content || !sign || !warn) return;
-  const over = sign.getBoundingClientRect().bottom > content.getBoundingClientRect().bottom + 2;
+  if (!content || !warn) return;
+  const over = content.scrollHeight > content.clientHeight + 2;
   warn.style.display = over ? 'inline' : 'none';
 }
 
@@ -2472,6 +2486,8 @@ function fitQuotePreview() {
   const scale = Math.min(1, avail / sheet.offsetWidth);
   scaler.style.transform = `scale(${scale})`;
   wrap.style.height = (sheet.offsetHeight * scale + 20) + 'px';
+  /* נבדק גם כאן: בפתיחת החלון הגיליון עדיין ללא פריסה בזמן הרינדור */
+  checkQuoteFit();
 }
 
 function openQuote(orderId) {
