@@ -513,7 +513,7 @@
     color: var(--q-deep); margin-top: 1.5mm; letter-spacing: .01em;
   }
   .qs-contact {
-    position: absolute; bottom: 6mm; inset-inline: 12mm; text-align: center;
+    position: absolute; bottom: 9mm; inset-inline: 12mm; text-align: center;
     font-family: 'Rubik', sans-serif; font-size: 8pt; color: var(--q-deep);
     line-height: 1.5;
   }
@@ -535,7 +535,7 @@
   .qs-to .lbl { color: #6a6a6a; }
   .qs-to .who { font-weight: 700; font-size: 13.5pt; }
 
-  .qs-title { text-align: center; margin: 10pt 0 9pt; }
+  .qs-title { text-align: center; margin: 17pt 0 10pt; }
   .qs-title h2 {
     display: inline-block; margin: 0; padding: 0 14pt 4pt;
     font-size: 16pt; font-weight: 900; color: var(--q-blue);
@@ -631,19 +631,21 @@
     }
 
     /* הדפדפן מדפיס בתוך שוליים משלו, שהמשתמש לא תמיד מבטל. במקום
-       להסתמך על ההגדרה שלו, הגיליון מוקטן ל-87.6% כך שייכנס גם
-       בשוליים ברירת מחדל של כרום ושל פיירפוקס.
+       להסתמך על ההגדרה שלו, הגיליון מוקטן ל-93% (276 מ״מ) — גובה
+       שנכנס בשוליים ברירת המחדל של כרום.
+       העוטף נמוך מהגיליון ב-3 מ״מ וגוזם את קצה הפס הדקורטיבי בלבד;
+       זה בלתי מורגש ומעניק מרווח ביטחון נוסף.
        הקטנה ב-transform אינה משנה את גובה התיבה לצורך חלוקה לעמודים,
        ולכן הגובה נקבע במפורש על העוטף. */
     .quote-preview-wrap {
       border: none !important; background: none !important; padding: 0 !important;
       margin: 0 !important; display: block !important;
       font-size: 0 !important; line-height: 0 !important;
-      height: 261mm !important; overflow: hidden !important;
+      height: 273mm !important; overflow: hidden !important;
     }
     .quote-scaler {
       display: block !important; width: 210mm !important; margin: 0 auto !important;
-      transform: scale(0.876) !important; transform-origin: top center !important;
+      transform: scale(0.93) !important; transform-origin: top center !important;
     }
 
     .quote-sheet {
@@ -1227,7 +1229,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 8';
+const APP_VERSION = '2026.08.25 · 9';
 
 let orders = [];
 let editingId = null;
