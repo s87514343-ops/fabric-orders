@@ -2,17 +2,25 @@
    מאפשר התקנה כאפליקציה ועבודה גם בלי אינטרנט.
    שים לב: הקובץ הזה חייב להיות באותה תיקייה כמו קובץ ה-HTML כשמעלים לאחסון. */
 
-const CACHE = 'fabric-orders-v2';
+/* העלאת המספר מכריחה את כל המכשירים לרענן את המטמון.
+   יש להעלות אותו בכל שינוי בקבצים הסטטיים. */
+const CACHE = 'fabric-orders-v3';
 
 /* קבצי הליבה — נשמרים מראש כדי שהאפליקציה תיפתח גם בלי אינטרנט */
-const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CORE = [
+  './', './index.html', './manifest.json',
+  './icon-192.png', './icon-512.png',
+  './q-head.jpg', './q-foot.jpg',
+];
 
-/* התקנה — שומרים את הליבה ונכנסים לתוקף מיד */
+/* התקנה — שומרים את הליבה ונכנסים לתוקף מיד.
+   cache:'reload' מונע שמירה מחדש של גרסה ישנה מהמטמון של הדפדפן. */
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(CORE))
-      .catch(() => {})   /* קובץ חסר לא ימנע את ההתקנה */
+      .then(c => Promise.all(
+        CORE.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {}))
+      ))
       .then(() => self.skipWaiting())
   );
 });

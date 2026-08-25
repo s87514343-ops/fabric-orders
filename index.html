@@ -937,6 +937,7 @@
       </p>
     </div>
     <div class="modal-foot">
+      <span id="versionLine" style="margin-inline-end:auto; align-self:center; font-size:12.5px; color:var(--muted);"></span>
       <button class="btn" id="testConnectionBtn">🔍 בדיקת חיבור</button>
       <button class="btn primary" id="saveSettingsBtn">שמירה וטעינה</button>
     </div>
@@ -1194,6 +1195,9 @@
 
 <script>
 /* ---------------- data ---------------- */
+/* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
+const APP_VERSION = '2026.08.25 · 3';
+
 let orders = [];
 let editingId = null;
 
@@ -1998,6 +2002,7 @@ async function saveToSheet() {
 
 document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('webappUrlInput').value = WEBAPP_URL;
+  document.getElementById('versionLine').textContent = 'גרסה ' + APP_VERSION;
   settingsOverlay.classList.add('open');
 });
 document.getElementById('closeSettings').addEventListener('click', () => settingsOverlay.classList.remove('open'));
@@ -2689,6 +2694,7 @@ async function runDiagnostics() {
 
   lastDiagText = [
     'בדיקת התקנה — ' + new Date().toLocaleString('he-IL'),
+    'גרסת אפליקציה: ' + APP_VERSION,
     'כתובת: ' + location.href,
     'דפדפן: ' + navigator.userAgent,
     '',
@@ -2738,8 +2744,19 @@ document.getElementById('doInstallBtn').addEventListener('click', async () => {
 let swError = '';
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js')
-    .then(() => { swError = ''; })
+    .then(reg => {
+      swError = '';
+      reg.update();   /* בדיקת גרסה חדשה בכל פתיחה */
+    })
     .catch(err => { swError = String(err && err.message || err); console.error('SW registration failed:', err); });
+
+  /* כשגרסה חדשה נכנסת לתוקף — רענון אוטומטי, כדי שלא יישאר תוכן ישן */
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
 }
 
 /* ---------------- init ---------------- */
