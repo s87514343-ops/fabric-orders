@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -475,6 +475,121 @@
     .hist-row .date { grid-column: 1 / -1; order: -1; }
   }
 
+  /* ============ quote sheet (A4) ============ */
+  .quote-preview-wrap {
+    grid-column: 1 / -1; overflow: hidden; border-radius: 12px;
+    border: 1px solid var(--border); background: #e9e9e6; padding: 10px;
+    display: flex; justify-content: center;
+  }
+  .quote-scaler { transform-origin: top center; }
+  .quote-sheet {
+    --q-rose: #e0798a;
+    --q-wine: #96263a;
+    --q-tint: #fbeef0;
+    --q-ink:  #2c2c2c;
+    position: relative; width: 210mm; height: 297mm; flex: none;
+    background: #fff; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    font-family: 'Frank Ruhl Libre', 'Rubik', serif;
+    color: var(--q-ink); direction: rtl; text-align: right;
+  }
+  .qs-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+  .qs-content {
+    position: absolute; top: 18.5%; bottom: 13%; right: 8.5%; left: 8.5%;
+    display: flex; flex-direction: column;
+  }
+
+  .qs-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5pt; }
+  .qs-top .bsd { font-weight: 700; }
+  .qs-top .dates { color: #5a5a5a; font-size: 10.5pt; }
+  .qs-top .dates span + span::before { content: '·'; margin: 0 7px; color: var(--q-rose); }
+
+  .qs-to { margin-top: 14pt; font-size: 12pt; line-height: 1.5; }
+  .qs-to .lbl { color: #6a6a6a; }
+  .qs-to .who { font-weight: 700; font-size: 13.5pt; }
+
+  .qs-title { text-align: center; margin: 16pt 0 12pt; }
+  .qs-title h2 {
+    display: inline-block; margin: 0; padding: 0 14pt 4pt;
+    font-size: 16pt; font-weight: 900; color: var(--q-wine);
+    border-bottom: 2px solid var(--q-rose); letter-spacing: .01em;
+  }
+
+  .qs-intro { font-size: 11.5pt; line-height: 1.75; margin: 0 0 12pt; text-align: justify; }
+
+  .qs-sec { margin-bottom: 11pt; }
+  .qs-sec h3 {
+    margin: 0 0 5pt; font-size: 12.5pt; font-weight: 700; color: var(--q-wine);
+    display: flex; align-items: center; gap: 7pt;
+  }
+  .qs-sec h3::before {
+    content: ''; width: 4pt; height: 13pt; border-radius: 2pt;
+    background: var(--q-rose); flex: none;
+  }
+  .qs-sec ul { margin: 0; padding: 0; list-style: none; }
+  .qs-sec li {
+    font-size: 11.5pt; line-height: 1.7; padding-inline-start: 15pt; position: relative;
+  }
+  .qs-sec li::before {
+    content: '◆'; position: absolute; inset-inline-start: 0; top: 0;
+    color: var(--q-rose); font-size: 7pt; line-height: 2.6;
+  }
+
+  .qs-table { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; font-size: 11.5pt; }
+  .qs-table thead th {
+    background: var(--q-rose); color: #fff; font-weight: 700; font-size: 11pt;
+    padding: 6pt 9pt; text-align: right; border: none;
+  }
+  .qs-table thead th:last-child, .qs-table td:last-child { text-align: left; }
+  .qs-table tbody td { padding: 6pt 9pt; border-bottom: 1px solid #ecdfe1; }
+  .qs-table tbody tr:nth-child(even) td { background: #fdf7f8; }
+  .qs-table .num { font-variant-numeric: tabular-nums; }
+  .qs-table tfoot td {
+    padding: 8pt 9pt; background: var(--q-tint); color: var(--q-wine);
+    font-weight: 900; font-size: 13pt; border-top: 2px solid var(--q-rose);
+  }
+
+  .qs-note {
+    font-size: 10pt; color: #6a6a6a; line-height: 1.6; margin: 0;
+    padding-inline-start: 9pt; border-inline-start: 2px solid var(--q-tint);
+  }
+
+  .qs-sign { margin-top: auto; padding-top: 10pt; text-align: left; font-size: 11.5pt; line-height: 1.6; }
+  .qs-sign .lbl { color: #6a6a6a; }
+  .qs-sign .nm { font-weight: 700; font-size: 12.5pt; color: var(--q-wine); }
+  .qs-sign .tel { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+
+  /* ============ print ============ */
+  @media print {
+    @page { size: A4; margin: 0; }
+    html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+    body > *:not(#quoteOverlay) { display: none !important; }
+
+    #quoteOverlay {
+      position: static !important; display: block !important; padding: 0 !important;
+      background: none !important; backdrop-filter: none !important; inset: auto !important;
+    }
+    #quoteOverlay .modal {
+      position: static !important; max-width: none !important; max-height: none !important;
+      border: none !important; border-radius: 0 !important; box-shadow: none !important;
+      overflow: visible !important; animation: none !important; background: none !important;
+    }
+    #quoteOverlay .modal::before { display: none !important; }
+    #quoteOverlay .modal-head, #quoteOverlay .modal-foot, #quoteOverlay .quote-form { display: none !important; }
+    #quoteOverlay .modal-body { display: block !important; padding: 0 !important; }
+
+    .quote-preview-wrap {
+      border: none !important; background: none !important; padding: 0 !important;
+      overflow: visible !important; height: auto !important; display: block !important;
+    }
+    .quote-scaler { transform: none !important; }
+    .quote-sheet {
+      box-shadow: none !important; margin: 0 !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .quote-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
   /* ============ install diagnostics ============ */
   .diag-box {
     border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
@@ -631,6 +746,7 @@
       <input type="file" id="importInput" accept=".xlsx,.xls">
     </button>
     <button class="btn" id="exportBtn">⬇️ ייצוא לאקסל</button>
+    <button class="btn" id="blankQuoteBtn" title="הצעת מחיר ריקה">📄 הצעת מחיר</button>
     <button class="btn primary" id="addBtn">＋ הזמנה חדשה</button>
   </div>
 
@@ -749,6 +865,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn ghost" id="deleteFromModal" style="color:var(--critical); display:none;">מחק הזמנה</button>
+      <button class="btn" id="quoteFromModal" style="display:none;">📄 הצעת מחיר</button>
       <button class="btn cal-btn" id="calFromModal" style="display:none;">📅 הוסף תזכורת ליומן</button>
       <button class="btn" id="cancelModal">ביטול</button>
       <button class="btn primary" id="saveOrder">שמירה</button>
@@ -793,6 +910,122 @@
     <div class="modal-foot">
       <button class="btn" id="exportReportBtn">⬇️ ייצוא הדוח לאקסל</button>
       <button class="btn primary" id="closeReports2">סגירה</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="quoteOverlay">
+  <div class="modal" style="max-width:900px;">
+    <div class="modal-head">
+      <h2>📄 הצעת מחיר</h2>
+      <button class="icon-btn" id="closeQuote">✕</button>
+    </div>
+    <div class="modal-body" style="grid-template-columns:1fr;">
+
+      <div class="quote-form">
+        <div class="modal-body" style="padding:0; grid-template-columns:1fr 1fr;">
+          <div class="field full">
+            <label>לכבוד</label>
+            <input type="text" id="q_to" placeholder="שם הלקוח / הגוף המזמין">
+          </div>
+          <div class="field full">
+            <label>הנדון</label>
+            <input type="text" id="q_subject">
+          </div>
+          <div class="field full">
+            <label>פסקת פתיחה</label>
+            <textarea id="q_intro" style="min-height:64px;"></textarea>
+          </div>
+          <div class="field full">
+            <label>תיאור המוצר <span style="font-weight:400; color:var(--muted);">— שורה לכל סעיף</span></label>
+            <textarea id="q_product" style="min-height:64px;"></textarea>
+          </div>
+          <div class="field full">
+            <label>הלכה וכשרות <span style="font-weight:400; color:var(--muted);">— שורה לכל סעיף</span></label>
+            <textarea id="q_kosher" style="min-height:78px;"></textarea>
+          </div>
+          <div class="field full">
+            <label>שם הפריט</label>
+            <input type="text" id="q_item">
+          </div>
+          <div class="field">
+            <label>כמות</label>
+            <input type="number" id="q_qty" min="0" step="1">
+          </div>
+          <div class="field">
+            <label>מחיר ליחידה (₪)</label>
+            <input type="number" id="q_unit" min="0" step="0.01">
+          </div>
+          <div class="field">
+            <label>סכום המוצרים (₪)</label>
+            <input type="number" id="q_amount" min="0" step="0.5">
+          </div>
+          <div class="field">
+            <label>דמי משלוח (₪)</label>
+            <input type="number" id="q_ship" min="0" step="0.5">
+          </div>
+          <div class="field full">
+            <label>הערת סיום</label>
+            <input type="text" id="q_note">
+          </div>
+          <div class="field">
+            <label>איש קשר להזמנות</label>
+            <input type="text" id="q_contact">
+          </div>
+          <div class="field">
+            <label>טלפון</label>
+            <input type="text" id="q_phone">
+          </div>
+        </div>
+      </div>
+
+      <div class="quote-preview-wrap" id="quotePreviewWrap">
+        <div class="quote-scaler" id="quoteScaler">
+          <div class="quote-sheet" id="quoteSheet">
+            <img class="qs-bg" src="letterhead.jpg" alt="">
+            <div class="qs-content">
+              <div class="qs-top">
+                <span class="bsd">בס"ד</span>
+                <span class="dates"><span id="qsHeb"></span><span id="qsGreg"></span></span>
+              </div>
+              <div class="qs-to">
+                <div class="lbl">לכבוד</div>
+                <div class="who" id="qsTo"></div>
+              </div>
+              <div class="qs-title"><h2 id="qsSubject"></h2></div>
+              <p class="qs-intro" id="qsIntro"></p>
+              <div class="qs-sec">
+                <h3>תיאור המוצר</h3>
+                <ul id="qsProduct"></ul>
+              </div>
+              <div class="qs-sec">
+                <h3>הלכה וכשרות</h3>
+                <ul id="qsKosher"></ul>
+              </div>
+              <table class="qs-table">
+                <thead>
+                  <tr><th>פריט</th><th>כמות</th><th>מחיר ליח׳</th><th>סה״כ</th></tr>
+                </thead>
+                <tbody id="qsRows"></tbody>
+                <tfoot>
+                  <tr><td colspan="3">סה״כ לתשלום · כולל מע״מ</td><td class="num" id="qsGrand"></td></tr>
+                </tfoot>
+              </table>
+              <p class="qs-note" id="qsNote"></p>
+              <div class="qs-sign">
+                <span class="lbl">להזמנות:</span>
+                <span class="nm" id="qsContact"></span><br>
+                <span class="tel" id="qsPhone"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="quoteResetBtn">איפוס לברירת מחדל</button>
+      <button class="btn primary" id="quotePrintBtn">🖨️ שמירה כ-PDF</button>
     </div>
   </div>
 </div>
@@ -1141,6 +1374,7 @@ function renderTable() {
         <td data-label="הערות" class="sub" style="max-width:240px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(o.notes || '—')}</td>
         <td data-label="">
           <div class="row-actions">
+            <button title="הצעת מחיר" onclick="openQuoteFromOrder('${o.id}')">📄</button>
             <button title="הוסף ליומן" class="cal-btn" onclick="addToCalendar('${o.id}')">📅</button>
             <button title="עריכה" onclick="openModal('${o.id}')">✏️</button>
             <button title="מחיקה" onclick="deleteOrder('${o.id}')">🗑️</button>
@@ -1219,6 +1453,7 @@ function openModal(id) {
 
   document.getElementById('modalTitle').textContent = order ? 'עריכת הזמנה' : 'הזמנה חדשה';
   document.getElementById('deleteFromModal').style.display = order ? 'inline-flex' : 'none';
+  document.getElementById('quoteFromModal').style.display = order ? 'inline-flex' : 'none';
   document.getElementById('calFromModal').style.display = (order && order.reminderDate) ? 'inline-flex' : 'none';
 
   document.getElementById('f_name').value = order?.name || '';
@@ -1289,6 +1524,11 @@ document.getElementById('closeModal').addEventListener('click', closeModal);
 document.getElementById('cancelModal').addEventListener('click', closeModal);
 overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 document.getElementById('calFromModal').addEventListener('click', () => { if (editingId) addToCalendar(editingId); });
+document.getElementById('quoteFromModal').addEventListener('click', () => {
+  const id = editingId;
+  closeModal();
+  openQuote(id);
+});
 
 document.getElementById('saveOrder').addEventListener('click', () => {
   const name = document.getElementById('f_name').value.trim();
@@ -1900,6 +2140,223 @@ document.getElementById('exportReportBtn').addEventListener('click', () => {
   XLSX.writeFile(wb, `דוח_הזמנות_${new Date().toISOString().slice(0,10)}.xlsx`);
   showToast('הדוח יוצא בהצלחה');
 });
+
+/* ---------------- quote (הצעת מחיר) ---------------- */
+const quoteOverlay = document.getElementById('quoteOverlay');
+const QUOTE_PREFS_KEY = 'fabricOrders.quotePrefs';
+
+/* ברירות המחדל נלקחו מהצעת המחיר הקיימת של העסק */
+const QUOTE_DEFAULTS = {
+  subject: 'הצעת מחיר לבדי בדיקה',
+  intro: 'מצ"ב בזאת הצעת מחיר עבור אספקת בדי בדיקה איכותיים, העומדים בכל הדרישות ההלכתיות והתקנים המחמירים ביותר:',
+  product: 'סוג הבד: 100% כותנה טבעית.\nמאפיינים: בד לבן וצח, עדין ורך במיוחד, מותאם לעור עדין ורגיש.',
+  kosher: 'ללא סיליקון, בהמלצת בודקות טהרה ובהוראת גדולי הדור שליט"א.\nבהכשר הבד"ץ העדה החרדית.\nהבדים מיוצרים בחסות ובפיקוח המרכז הארצי למען טהרת המשפחה בישראל.',
+  item: 'בדי בדיקה סוג א׳ א׳',
+  note: 'ההצעה בתוקף ל-30 יום ממועד הוצאתה. המחירים כוללים מע"מ.',
+  contact: 'שרה לוי',
+  phone: '054-4896587',
+};
+
+function loadQuotePrefs() {
+  try {
+    const raw = localStorage.getItem(QUOTE_PREFS_KEY);
+    return raw ? Object.assign({}, QUOTE_DEFAULTS, JSON.parse(raw)) : Object.assign({}, QUOTE_DEFAULTS);
+  } catch (e) { return Object.assign({}, QUOTE_DEFAULTS); }
+}
+function saveQuotePrefs(p) {
+  try { localStorage.setItem(QUOTE_PREFS_KEY, JSON.stringify(p)); } catch (e) { /* אחסון חסום */ }
+}
+
+/* המרת מספר לאותיות עבריות. הדפדפנים אינם תומכים בזה דרך Intl,
+   ולכן ההמרה נעשית כאן — כולל ט״ו וט״ז שאינם נכתבים כצירוף השם. */
+function gematria(n) {
+  const LETTERS = [
+    [400, 'ת'], [300, 'ש'], [200, 'ר'], [100, 'ק'],
+    [90, 'צ'], [80, 'פ'], [70, 'ע'], [60, 'ס'], [50, 'נ'],
+    [40, 'מ'], [30, 'ל'], [20, 'כ'], [10, 'י'],
+    [9, 'ט'], [8, 'ח'], [7, 'ז'], [6, 'ו'], [5, 'ה'],
+    [4, 'ד'], [3, 'ג'], [2, 'ב'], [1, 'א'],
+  ];
+  let out = '', rest = n;
+  while (rest > 0) {
+    if (rest === 15) { out += 'טו'; break; }
+    if (rest === 16) { out += 'טז'; break; }
+    const hit = LETTERS.find(([v]) => rest >= v);
+    if (!hit) break;
+    out += hit[1];
+    rest -= hit[0];
+  }
+  return out;
+}
+
+/* גרש לאות בודדת, גרשיים לפני האחרונה */
+function withGeresh(s) {
+  if (!s) return '';
+  return s.length === 1 ? s + '׳' : s.slice(0, -1) + '״' + s.slice(-1);
+}
+
+/* תאריך עברי מלא: י״ב באלול תשפ״ו */
+function hebrewDate(d) {
+  try {
+    const parts = new Intl.DateTimeFormat('he', {
+      calendar: 'hebrew', day: 'numeric', month: 'long', year: 'numeric',
+    }).formatToParts(d);
+    const get = t => (parts.find(p => p.type === t) || {}).value || '';
+    const day = parseInt(get('day'), 10);
+    const year = parseInt(get('year'), 10);
+    const month = get('month');
+    if (!day || !year || !month) throw new Error('unparsed');
+    return `${withGeresh(gematria(day))} ב${month} ${withGeresh(gematria(year % 1000))}`;
+  } catch (e) {
+    /* דפדפן ללא לוח עברי — עדיף תאריך לועזי מאשר כלום */
+    try { return new Intl.DateTimeFormat('he-u-ca-hebrew', { dateStyle: 'long' }).format(d); }
+    catch (e2) { return ''; }
+  }
+}
+
+const QUOTE_FIELDS = {
+  q_to: 'to', q_subject: 'subject', q_intro: 'intro', q_product: 'product',
+  q_kosher: 'kosher', q_item: 'item', q_qty: 'qty', q_unit: 'unit',
+  q_amount: 'amount', q_ship: 'ship', q_note: 'note', q_contact: 'contact', q_phone: 'phone',
+};
+
+function readQuoteForm() {
+  const v = {};
+  for (const id of Object.keys(QUOTE_FIELDS)) v[QUOTE_FIELDS[id]] = document.getElementById(id).value;
+  return v;
+}
+
+function bullets(text) {
+  return String(text || '').split('\n').map(s => s.trim()).filter(Boolean)
+    .map(s => `<li>${escapeHtml(s)}</li>`).join('');
+}
+
+function renderQuote() {
+  const v = readQuoteForm();
+  const now = new Date();
+
+  document.getElementById('qsHeb').textContent = hebrewDate(now);
+  document.getElementById('qsGreg').textContent = now.toLocaleDateString('he-IL');
+  document.getElementById('qsTo').textContent = v.to || '—';
+  document.getElementById('qsSubject').textContent = v.subject || '';
+  document.getElementById('qsIntro').textContent = v.intro || '';
+  document.getElementById('qsProduct').innerHTML = bullets(v.product);
+  document.getElementById('qsKosher').innerHTML = bullets(v.kosher);
+  document.getElementById('qsNote').textContent = v.note || '';
+  document.getElementById('qsContact').textContent = v.contact || '';
+  document.getElementById('qsPhone').textContent = v.phone || '';
+
+  const qty = Number(v.qty) || 0;
+  const unit = Number(v.unit) || 0;
+  const amount = Number(v.amount) || 0;
+  const ship = Number(v.ship) || 0;
+
+  let rows = `<tr>
+      <td>${escapeHtml(v.item || '')}</td>
+      <td class="num">${qty ? qty.toLocaleString('he-IL') : '—'}</td>
+      <td class="num">${unit ? fmtQ(unit) : '—'}</td>
+      <td class="num">${fmtQ(amount)}</td>
+    </tr>`;
+  if (ship > 0) {
+    rows += `<tr><td colspan="3">דמי משלוח</td><td class="num">${fmtQ(ship)}</td></tr>`;
+  }
+  document.getElementById('qsRows').innerHTML = rows;
+  document.getElementById('qsGrand').textContent = fmtQ(amount + ship);
+}
+
+/* סכום בפורמט מסמך: ללא עיגול אגורות מיותר */
+function fmtQ(n) {
+  n = Number(n) || 0;
+  const s = Number.isInteger(n) ? n.toLocaleString('he-IL')
+    : n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return s + ' ₪';
+}
+
+/* מתאים את גודל התצוגה המקדימה לרוחב החלון */
+function fitQuotePreview() {
+  const wrap = document.getElementById('quotePreviewWrap');
+  const scaler = document.getElementById('quoteScaler');
+  const sheet = document.getElementById('quoteSheet');
+  const avail = wrap.clientWidth - 20;
+  const scale = Math.min(1, avail / sheet.offsetWidth);
+  scaler.style.transform = `scale(${scale})`;
+  wrap.style.height = (sheet.offsetHeight * scale + 20) + 'px';
+}
+
+function openQuote(orderId) {
+  const p = loadQuotePrefs();
+  const o = orderId ? orders.find(x => x.id === orderId) : null;
+
+  document.getElementById('q_to').value = o ? (o.name || '') : '';
+  document.getElementById('q_subject').value = p.subject;
+  document.getElementById('q_intro').value = p.intro;
+  document.getElementById('q_product').value = p.product;
+  document.getElementById('q_kosher').value = p.kosher;
+  document.getElementById('q_item').value = p.item;
+  document.getElementById('q_qty').value = o ? (o.qty ?? '') : '';
+  document.getElementById('q_unit').value = o ? (o.unitPrice ?? '') : '';
+  document.getElementById('q_amount').value = o ? orderProducts(o) : '';
+  document.getElementById('q_ship').value = o ? orderShipping(o) : '';
+  document.getElementById('q_note').value = p.note;
+  document.getElementById('q_contact').value = p.contact;
+  document.getElementById('q_phone').value = p.phone;
+
+  renderQuote();
+  quoteOverlay.classList.add('open');
+  setTimeout(fitQuotePreview, 60);
+}
+
+function openQuoteFromOrder(id) { openQuote(id); }
+function closeQuote() { quoteOverlay.classList.remove('open'); }
+
+/* כל שינוי בטופס מתעדכן מיד בתצוגה, והעדפות הנוסח נשמרות */
+Object.keys(QUOTE_FIELDS).forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    renderQuote();
+    const v = readQuoteForm();
+    saveQuotePrefs({
+      subject: v.subject, intro: v.intro, product: v.product, kosher: v.kosher,
+      item: v.item, note: v.note, contact: v.contact, phone: v.phone,
+    });
+  });
+});
+
+document.getElementById('closeQuote').addEventListener('click', closeQuote);
+quoteOverlay.addEventListener('click', (e) => { if (e.target === quoteOverlay) closeQuote(); });
+window.addEventListener('resize', () => {
+  if (quoteOverlay.classList.contains('open')) fitQuotePreview();
+});
+
+document.getElementById('quoteResetBtn').addEventListener('click', () => {
+  saveQuotePrefs({});
+  const to = document.getElementById('q_to').value;
+  const qty = document.getElementById('q_qty').value;
+  const unit = document.getElementById('q_unit').value;
+  const amount = document.getElementById('q_amount').value;
+  const ship = document.getElementById('q_ship').value;
+  const p = Object.assign({}, QUOTE_DEFAULTS);
+  document.getElementById('q_subject').value = p.subject;
+  document.getElementById('q_intro').value = p.intro;
+  document.getElementById('q_product').value = p.product;
+  document.getElementById('q_kosher').value = p.kosher;
+  document.getElementById('q_item').value = p.item;
+  document.getElementById('q_note').value = p.note;
+  document.getElementById('q_contact').value = p.contact;
+  document.getElementById('q_phone').value = p.phone;
+  document.getElementById('q_to').value = to;
+  document.getElementById('q_qty').value = qty;
+  document.getElementById('q_unit').value = unit;
+  document.getElementById('q_amount').value = amount;
+  document.getElementById('q_ship').value = ship;
+  renderQuote();
+  showToast('הנוסח אופס לברירת המחדל');
+});
+
+document.getElementById('quotePrintBtn').addEventListener('click', () => {
+  window.print();
+});
+
+document.getElementById('blankQuoteBtn').addEventListener('click', () => openQuote(null));
 
 /* ---------------- customer history ---------------- */
 const customerOverlay = document.getElementById('customerOverlay');
