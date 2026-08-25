@@ -664,6 +664,31 @@
     .quote-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 
+  /* ============ quotes archive ============ */
+  .arch-row {
+    display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center;
+    width: 100%; padding: 11px 13px; margin-bottom: 7px; border-radius: 11px;
+    border: 1px solid var(--border); background: var(--surface-2);
+    border-inline-start: 4px solid var(--aqua);
+    font-family: inherit; font-size: 14.5px; text-align: start; color: var(--text-primary);
+  }
+  .arch-row .date { font-variant-numeric: tabular-nums; color: var(--text-secondary); font-size: 13px; white-space: nowrap; }
+  .arch-row .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+  .arch-row .who small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .arch-row .sum { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .arch-row .acts { display: flex; gap: 4px; }
+  .arch-row .acts button {
+    border: none; background: transparent; cursor: pointer; color: var(--muted);
+    width: 32px; height: 32px; border-radius: 8px; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .arch-row .acts button:hover { background: var(--gridline); color: var(--text-primary); }
+  @media (max-width: 560px) {
+    .arch-row { grid-template-columns: 1fr auto; }
+    .arch-row .date { grid-column: 1 / -1; order: -1; }
+    .arch-row .acts { grid-column: 1 / -1; justify-content: flex-end; }
+  }
+
   /* ============ install diagnostics ============ */
   .diag-box {
     border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
@@ -821,6 +846,7 @@
     </button>
     <button class="btn" id="exportBtn">⬇️ ייצוא לאקסל</button>
     <button class="btn" id="blankQuoteBtn" title="הצעת מחיר ריקה">📄 הצעת מחיר</button>
+    <button class="btn" id="archiveBtn" title="הצעות שנשלחו">📁 ארכיון הצעות</button>
     <button class="btn primary" id="addBtn">＋ הזמנה חדשה</button>
   </div>
 
@@ -1151,8 +1177,23 @@
         ⚠️ התוכן חורג מהעמוד — כדאי לקצר
       </span>
       <button class="btn" id="quoteResetBtn">איפוס לברירת מחדל</button>
+      <button class="btn" id="quoteSaveCopyBtn">💾 שמירת העתק</button>
       <button class="btn wa-btn" id="quoteWaBtn">💬 שליחה בוואטסאפ</button>
       <button class="btn primary" id="quotePrintBtn">🖨️ שמירה כ-PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="archiveOverlay">
+  <div class="modal stripe-aqua" style="max-width:620px;">
+    <div class="modal-head">
+      <h2>📁 הצעות שנשלחו</h2>
+      <button class="icon-btn" id="closeArchive">✕</button>
+    </div>
+    <div class="modal-body" id="archiveBody" style="grid-template-columns:1fr;"></div>
+    <div class="modal-foot">
+      <span id="archiveNote" style="margin-inline-end:auto; align-self:center; font-size:12.5px; color:var(--muted);"></span>
+      <button class="btn primary" id="closeArchive2">סגירה</button>
     </div>
   </div>
 </div>
@@ -1245,7 +1286,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 16';
+const APP_VERSION = '2026.08.25 · 17';
 
 let orders = [];
 let editingId = null;
@@ -2664,14 +2705,19 @@ document.getElementById('quoteResetBtn').addEventListener('click', () => {
   showToast('הנוסח אופס לברירת המחדל');
 });
 
+/* הדפסה ושליחה הן רגעי ה״נשלח״ — נשמר העתק אוטומטית */
 document.getElementById('quotePrintBtn').addEventListener('click', () => {
+  saveQuoteCopy(true);
   window.print();
 });
 
 document.getElementById('blankQuoteBtn').addEventListener('click', () => openQuote(null));
+document.getElementById('archiveBtn').addEventListener('click', openArchive);
+document.getElementById('quoteSaveCopyBtn').addEventListener('click', () => saveQuoteCopy(false));
 
 document.getElementById('quoteWaBtn').addEventListener('click', () => {
   if (!quoteCustomerPhone) showToast('אין טלפון ללקוח — וואטסאפ ייפתח לבחירת נמען');
+  saveQuoteCopy(true);
   waOpen(quoteCustomerPhone, quoteWaText());
 });
 
@@ -2739,6 +2785,172 @@ function quoteWaText() {
   if (v.phone) L.push(v.phone);
   return L.join('\n');
 }
+
+/* ---------------- ארכיון הצעות מחיר ----------------
+   נשמר בגיליון (גיליון נפרד בשם "הצעות מחיר") כדי שיהיה זמין בכל
+   מכשיר, ובמקביל בדפדפן כגיבוי. אם הסקריפט בגיליון עדיין לא מכיר
+   את הפעולות האלה, נשמר מקומית בלבד. */
+const QUOTES_KEY = 'fabricOrders.savedQuotes';
+let savedQuotes = [];
+let quotesSheetOk = false;
+
+function loadQuotesLocal() {
+  try { return JSON.parse(localStorage.getItem(QUOTES_KEY) || '[]'); } catch (e) { return []; }
+}
+function persistQuotesLocal() {
+  try { localStorage.setItem(QUOTES_KEY, JSON.stringify(savedQuotes)); } catch (e) { /* אחסון חסום */ }
+}
+
+const QUOTE_COLS = ['id','savedAt','to','subject','item','qty','unit','amount','shipping','vat','grand',
+                    'intro','product','kosher','note','contact','phone','footer'];
+
+async function loadQuotesFromSheet() {
+  if (!WEBAPP_URL) { savedQuotes = loadQuotesLocal(); return; }
+  try {
+    const json = await callSheet('loadQuotes');
+    if (json && json.ok && Array.isArray(json.rows)) {
+      quotesSheetOk = true;
+      savedQuotes = json.rows.filter(r => r.id).map(r => {
+        const q = {};
+        QUOTE_COLS.forEach(c => { q[c] = r[c] ?? ''; });
+        ['qty','unit','amount','shipping','vat','grand'].forEach(k => { q[k] = Number(q[k]) || 0; });
+        return q;
+      });
+      persistQuotesLocal();
+      return;
+    }
+  } catch (e) { /* הסקריפט הישן אינו מכיר את הפעולה */ }
+  savedQuotes = loadQuotesLocal();
+}
+
+async function saveQuotesToSheet() {
+  persistQuotesLocal();
+  if (!WEBAPP_URL) return;
+  try {
+    const rows = savedQuotes.map(q => QUOTE_COLS.map(c => q[c] ?? ''));
+    const json = await callSheet('saveQuotes', { headers: QUOTE_COLS, rows });
+    quotesSheetOk = !!(json && json.ok);
+  } catch (e) { quotesSheetOk = false; }
+}
+
+/* מצלם את מצב הטופס הנוכחי כהעתק שמור */
+function snapshotQuote() {
+  const v = readQuoteForm();
+  const amount = Number(v.amount) || 0, ship = Number(v.ship) || 0;
+  const rate = (Number(v.vat) || 0) / 100;
+  const vat = amount * rate;
+  return {
+    id: 'q_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    savedAt: new Date().toISOString(),
+    to: v.to || '', subject: v.subject || '', item: v.item || '',
+    qty: Number(v.qty) || 0, unit: Number(v.unit) || 0,
+    amount, shipping: ship, vat, grand: amount + vat + ship,
+    intro: v.intro || '', product: v.product || '', kosher: v.kosher || '',
+    note: v.note || '', contact: v.contact || '', phone: v.phone || '', footer: v.footer || '',
+  };
+}
+
+/* שומר העתק. מדלג אם ההצעה האחרונה זהה בתוכן — כדי שהדפסה
+   ושליחה בוואטסאפ של אותה הצעה לא ייצרו שני רישומים. */
+function saveQuoteCopy(silent) {
+  const snap = snapshotQuote();
+  const sameAs = q => q && ['to','subject','item','qty','unit','amount','shipping','note'].every(k => String(q[k]) === String(snap[k]));
+  if (savedQuotes.some(sameAs)) {
+    if (!silent) showToast('העתק זהה כבר שמור בארכיון');
+    return;
+  }
+  savedQuotes.unshift(snap);
+  saveQuotesToSheet();
+  renderQuotesHistory();
+  showToast(quotesSheetOk === false && WEBAPP_URL
+    ? 'ההעתק נשמר במכשיר הזה בלבד' : 'ההעתק נשמר בארכיון');
+}
+
+const archiveOverlay = document.getElementById('archiveOverlay');
+
+function renderQuotesHistory() {
+  const body = document.getElementById('archiveBody');
+  const note = document.getElementById('archiveNote');
+  if (!body) return;
+
+  note.textContent = savedQuotes.length
+    ? (quotesSheetOk ? `${savedQuotes.length} הצעות · מסונכרן לגיליון` : `${savedQuotes.length} הצעות · במכשיר הזה בלבד`)
+    : '';
+
+  if (!savedQuotes.length) {
+    body.innerHTML = `<div class="rep-empty" style="text-align:center; padding:26px 0;">
+        עדיין לא נשמרו הצעות.<br>
+        <span class="sub">כל הצעה שתשמור, תדפיס או תשלח בוואטסאפ תופיע כאן.</span>
+      </div>`;
+    return;
+  }
+
+  body.innerHTML = savedQuotes.map(q => `
+    <div class="arch-row" data-id="${q.id}">
+      <span class="date">${fmtDate(q.savedAt)}</span>
+      <span class="who">${escapeHtml(q.to || 'ללא נמען')}
+        <small>${escapeHtml(q.item || '')}${q.qty ? ' · ' + Number(q.qty).toLocaleString('he-IL') + ' יח׳' : ''}</small>
+      </span>
+      <span class="sum">${fmtQ(q.grand)}</span>
+      <span class="acts">
+        <button title="פתיחה מחדש" data-act="open">↗️</button>
+        <button title="שליחה בוואטסאפ" data-act="wa">💬</button>
+        <button title="מחיקה מהארכיון" data-act="del">🗑️</button>
+      </span>
+    </div>`).join('');
+
+  body.querySelectorAll('.arch-row').forEach(row => {
+    row.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const q = savedQuotes.find(x => x.id === row.dataset.id);
+      if (!q) return;
+      if (b.dataset.act === 'del') return deleteSavedQuote(q.id);
+      restoreQuote(q);
+      if (b.dataset.act === 'wa') {
+        closeArchive();
+        setTimeout(() => document.getElementById('quoteWaBtn').click(), 120);
+      } else {
+        closeArchive();
+      }
+    }));
+  });
+}
+
+/* טוען העתק שמור חזרה לטופס, כדי לצפות בו או להדפיס שוב */
+function restoreQuote(q) {
+  const map = {
+    q_to: 'to', q_subject: 'subject', q_intro: 'intro', q_product: 'product',
+    q_kosher: 'kosher', q_item: 'item', q_qty: 'qty', q_unit: 'unit',
+    q_amount: 'amount', q_ship: 'shipping', q_note: 'note',
+    q_contact: 'contact', q_phone: 'phone', q_footer: 'footer',
+  };
+  Object.entries(map).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = q[key] ?? '';
+  });
+  /* שיעור המע״מ משוחזר מהסכומים ששמורים, לא מההגדרה הנוכחית */
+  const rate = q.amount ? Math.round((q.vat / q.amount) * 1000) / 10 : VAT_RATE;
+  document.getElementById('q_vat').value = rate;
+  document.getElementById('q_target').value = Math.round((q.amount + q.vat) * 100) / 100;
+  document.getElementById('q_type').value = q.item || '';
+  quoteCustomerPhone = '';
+  renderQuote();
+  quoteOverlay.classList.add('open');
+  setTimeout(fitQuotePreview, 60);
+}
+
+function deleteSavedQuote(id) {
+  savedQuotes = savedQuotes.filter(q => q.id !== id);
+  saveQuotesToSheet();
+  renderQuotesHistory();
+  showToast('ההעתק נמחק מהארכיון');
+}
+
+function openArchive() { renderQuotesHistory(); archiveOverlay.classList.add('open'); }
+function closeArchive() { archiveOverlay.classList.remove('open'); }
+
+document.getElementById('closeArchive').addEventListener('click', closeArchive);
+document.getElementById('closeArchive2').addEventListener('click', closeArchive);
+archiveOverlay.addEventListener('click', (e) => { if (e.target === archiveOverlay) closeArchive(); });
 
 /* ---------------- customer history ---------------- */
 const customerOverlay = document.getElementById('customerOverlay');
@@ -3008,9 +3220,11 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 /* ---------------- init ---------------- */
 /* מופעל אחרי שההזדהות עברה בהצלחה (או מיד, כשההזדהות כבויה) */
 function bootApp() {
+  savedQuotes = loadQuotesLocal();
   render();
   if (WEBAPP_URL) {
     loadFromSheet(true);
+    loadQuotesFromSheet();
   } else {
     setSyncStatus('offline', 'לא מחובר לשיטס');
     /* הפעלה ראשונה במכשיר הזה — פותחים את ההגדרות כדי לחבר את הגיליון */
