@@ -97,6 +97,12 @@
   .sync-pill.error .dot { background: var(--critical); }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
   .cal-btn { color: var(--brand) !important; }
+  /* וואטסאפ — בצבע המותג שלהם, כדי שיזוהה מיד */
+  .wa-btn { border-color: #25d366 !important; color: #128c3f !important; font-weight: 700; }
+  .wa-btn:hover { background: #e7f8ee !important; }
+  [data-theme="dark"] .wa-btn { color: #4ce07f !important; }
+  [data-theme="dark"] .wa-btn:hover { background: #10331d !important; }
+  .row-actions .wa-btn { color: #128c3f !important; border: none !important; }
 
   /* stat tiles */
   .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
@@ -1136,6 +1142,7 @@
         ⚠️ התוכן חורג מהעמוד — כדאי לקצר
       </span>
       <button class="btn" id="quoteResetBtn">איפוס לברירת מחדל</button>
+      <button class="btn wa-btn" id="quoteWaBtn">💬 שליחה בוואטסאפ</button>
       <button class="btn primary" id="quotePrintBtn">🖨️ שמירה כ-PDF</button>
     </div>
   </div>
@@ -1229,7 +1236,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 12';
+const APP_VERSION = '2026.08.25 · 13';
 
 let orders = [];
 let editingId = null;
@@ -1509,6 +1516,7 @@ function renderTable() {
         <td data-label="הערות" class="sub" style="max-width:240px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(o.notes || '—')}</td>
         <td data-label="">
           <div class="row-actions">
+            <button title="שליחת הודעה בוואטסאפ" class="wa-btn" onclick="waOrder('${o.id}')">💬</button>
             <button title="הצעת מחיר" onclick="openQuoteFromOrder('${o.id}')">📄</button>
             <button title="הוסף ליומן" class="cal-btn" onclick="addToCalendar('${o.id}')">📅</button>
             <button title="עריכה" onclick="openModal('${o.id}')">✏️</button>
@@ -2492,10 +2500,14 @@ function fitQuotePreview() {
   checkQuoteFit();
 }
 
+/* טלפון הלקוח שההצעה נפתחה עבורו — לשליחה בוואטסאפ */
+let quoteCustomerPhone = '';
+
 function openQuote(orderId) {
   const p = loadQuotePrefs();
   const o = orderId ? orders.find(x => x.id === orderId) : null;
 
+  quoteCustomerPhone = o ? (o.phone || '') : '';
   document.getElementById('q_to').value = o ? (o.name || '') : '';
   document.getElementById('q_subject').value = p.subject;
   document.getElementById('q_intro').value = p.intro;
@@ -2594,6 +2606,75 @@ document.getElementById('quotePrintBtn').addEventListener('click', () => {
 });
 
 document.getElementById('blankQuoteBtn').addEventListener('click', () => openQuote(null));
+
+document.getElementById('quoteWaBtn').addEventListener('click', () => {
+  if (!quoteCustomerPhone) showToast('אין טלפון ללקוח — וואטסאפ ייפתח לבחירת נמען');
+  waOpen(quoteCustomerPhone, quoteWaText());
+});
+
+/* ---------------- וואטסאפ ----------------
+   דפדפן אינו יכול לצרף קובץ לוואטסאפ, ולכן נשלחת הודעת טקסט מעוצבת.
+   את קובץ ה-PDF יש לצרף ידנית לאחר שמירתו. */
+
+/* wa.me דורש מספר בפורמט בינלאומי בלי סימנים */
+function waPhone(p) {
+  const d = String(p || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('972')) return d;
+  if (d.startsWith('0')) return '972' + d.slice(1);
+  if (d.length === 9) return '972' + d;   /* מספר בלי אפס מוביל */
+  return d;
+}
+
+/* בלי מספר — וואטסאפ ייפתח ויבקש לבחור נמען */
+function waOpen(phone, text) {
+  const num = waPhone(phone);
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(text), '_blank');
+}
+
+/* הודעה קצרה על הזמנה, מהטבלה */
+function waOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  if (!o.phone) showToast('אין טלפון ללקוח — וואטסאפ ייפתח לבחירת נמען');
+  /* null מסמן שורה שיש להשמיט; מחרוזת ריקה היא שורת רווח מכוונת */
+  const lines = [
+    `שלום ${o.name || ''}`.trim() + ',',
+    '',
+    o.qty ? `כמות: ${Number(o.qty).toLocaleString('he-IL')}` : null,
+    `סה״כ לתשלום: ${fmtCurrency(orderTotal(o))} (כולל מע״מ)`,
+    o.deliveryDate ? `תאריך משלוח: ${fmtDate(o.deliveryDate)}` : null,
+    !isPaid(o) ? 'סטטוס: טרם שולם' : null,
+  ].filter(l => l !== null);
+  waOpen(o.phone, lines.join('\n'));
+}
+
+/* הודעה מלאה של הצעת המחיר. כוכביות = מודגש בוואטסאפ. */
+function quoteWaText() {
+  const v = readQuoteForm();
+  const qty = Number(v.qty) || 0, unit = Number(v.unit) || 0;
+  const amount = Number(v.amount) || 0, ship = Number(v.ship) || 0;
+  const rate = (Number(v.vat) || 0) / 100;
+  const subtotal = amount + ship, vat = subtotal * rate, grand = subtotal + vat;
+
+  const L = ['בס"ד', ''];
+  if (v.to) L.push(`לכבוד ${v.to},`);
+  L.push(`*${v.subject || 'הצעת מחיר'}*`, '');
+  L.push(`▪️ ${v.item || ''}`);
+  if (qty && unit) L.push(`כמות ${qty.toLocaleString('he-IL')} · מחיר ליח׳ ${fmtQ(unit)}`);
+  L.push(`סכום: ${fmtQ(amount)}`);
+  if (ship > 0) L.push(`▪️ דמי משלוח: ${fmtQ(ship)}`);
+  L.push('');
+  if (rate > 0) {
+    L.push(`סכום לפני מע״מ: ${fmtQ(subtotal)}`);
+    L.push(`מע״מ ${(rate * 100).toLocaleString('he-IL')}%: ${fmtQ(vat)}`);
+  }
+  L.push(`*סה״כ לתשלום: ${fmtQ(grand)}*`);
+  if (v.note) L.push('', v.note);
+  L.push('', `להזמנות: ${v.contact || ''}`.trim());
+  if (v.phone) L.push(v.phone);
+  return L.join('\n');
+}
 
 /* ---------------- customer history ---------------- */
 const customerOverlay = document.getElementById('customerOverlay');
