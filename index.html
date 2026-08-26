@@ -242,7 +242,14 @@
   .modal-head h2 { margin: 0; font-size: 19px; }
   .modal-body { padding: 20px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .modal-body .full { grid-column: 1 / -1; }
-  .field label { display:block; font-size: 14px; color: var(--text-secondary); margin-bottom: 5px; font-weight: 600; }
+  /* פריט ברשת אינו מתכווץ מתחת לרוחב תוכנו כברירת מחדל, ואז טקסט
+     ארוך מרחיב את העמודה וגולש מהחלון במקום לעטוף. */
+  .modal-body > * { min-width: 0; }
+  .field label {
+    display: block; font-size: 14px; color: var(--text-secondary);
+    margin-bottom: 5px; font-weight: 600;
+    overflow-wrap: anywhere; word-break: break-word;
+  }
   .field input, .field select, .field textarea {
     width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border);
     background: var(--surface-2); color: var(--text-primary); font-family: inherit; font-size: 17px;
@@ -425,7 +432,12 @@
     grid-column: 1 / -1; border-radius: 12px; padding: 14px 16px;
     background: var(--brand-tint); border: 1px solid var(--border);
   }
-  .total-box .line { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; color: var(--text-secondary); margin-bottom: 6px; }
+  .total-box .line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 10px; flex-wrap: wrap; font-size: 15px;
+    color: var(--text-secondary); margin-bottom: 6px;
+  }
+  .total-box .line > span:first-child { min-width: 0; overflow-wrap: anywhere; }
   .total-box .line.grand {
     margin: 8px 0 0; padding-top: 10px; border-top: 1px dashed var(--border);
     font-size: 19px; font-weight: 800; color: var(--text-primary);
@@ -918,7 +930,7 @@
       </div>
       <div class="field full">
         <label>🎯 סכום המוצרים שאני רוצה (כולל מע״מ)
-          <span style="font-weight:400; color:var(--muted);">— המחיר ליחידה יחושב לאחור. דמי המשלוח מתווספים בנפרד ואינם משפיעים עליו.</span>
+          <span style="font-weight:400; color:var(--muted);">— המחיר ליחידה יחושב לאחור. המשלוח נפרד ואינו משפיע עליו.</span>
         </label>
         <input type="number" id="f_target" min="0" step="0.5" placeholder="לדוגמה: 3000">
       </div>
@@ -1286,7 +1298,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 18';
+const APP_VERSION = '2026.08.25 · 19';
 
 let orders = [];
 let editingId = null;
@@ -1557,7 +1569,7 @@ function renderTable() {
         </td>
         <td data-label="כמות">
           ${o.qty ?? '—'}
-          ${o.unitPrice ? `<div class="sub" style="font-weight:400;">מחיר ליח׳: ${fmtCurrency(o.unitPrice)}</div>` : ''}
+          ${o.unitPrice ? `<div class="sub" style="font-weight:400;">מחיר ליח׳: ${fmtQ(o.unitPrice)}</div>` : ''}
         </td>
         <td data-label="סה״כ" class="amount">
           ${fmtCurrency(orderTotal(o))}
