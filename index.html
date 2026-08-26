@@ -1007,6 +1007,10 @@
         <label>כתובת ה-Web App (מהסקריפט בגיליון שלך)</label>
         <input type="url" id="webappUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
       </div>
+      <div class="field full">
+        <label>🛟 גיבויים אוטומטיים <span style="font-weight:400; color:var(--muted);">— נשמרים בכל טעינה מהגיליון</span></label>
+        <div id="backupList" style="font-size:14px;"></div>
+      </div>
       <p style="font-size:13px; color:var(--text-secondary); margin:0; line-height:1.7;">
         🔒 הכתובת נשמרת <strong>רק במכשיר הזה</strong> ואינה נמצאת בקוד האפליקציה — כך היא לא נחשפת לאף אחד אחר.
         <br>
@@ -1196,6 +1200,23 @@
   </div>
 </div>
 
+<div class="overlay" id="confirmOverlay" style="z-index:70;">
+  <div class="modal stripe-warm" style="max-width:420px;">
+    <div class="modal-head">
+      <h2 id="confirmTitle">אישור</h2>
+      <button class="icon-btn" id="confirmClose">✕</button>
+    </div>
+    <div class="modal-body" style="grid-template-columns:1fr;">
+      <p id="confirmMsg" style="margin:0; font-size:15px; line-height:1.7;"></p>
+      <div id="confirmDetail" class="rep-card" style="display:none;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="confirmCancel">ביטול</button>
+      <button class="btn" id="confirmOk" style="background:var(--critical); border-color:var(--critical); color:#fff; font-weight:700;">מחק</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="archiveOverlay">
   <div class="modal stripe-aqua" style="max-width:620px;">
     <div class="modal-head">
@@ -1298,7 +1319,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 20';
+const APP_VERSION = '2026.08.26 · 21';
 
 let orders = [];
 let editingId = null;
@@ -1818,15 +1839,39 @@ document.getElementById('saveOrder').addEventListener('click', () => {
 });
 
 document.getElementById('deleteFromModal').addEventListener('click', () => {
-  if (editingId) deleteOrder(editingId);
+  /* המזהה נשמר לפני הסגירה — closeModal מאפס את editingId */
+  const id = editingId;
   closeModal();
+  if (id) deleteOrder(id);
 });
 
-function deleteOrder(id) {
-  orders = orders.filter(o => o.id !== id);
+async function deleteOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+
+  const ok = await askConfirm({
+    title: '🗑️ מחיקת הזמנה',
+    message: 'הפעולה תמחק את ההזמנה גם מהגיליון. להמשיך?',
+    detail: `<div class="k">${escapeHtml(o.name || 'ללא שם')}</div>
+             <div class="v">${fmtCurrency(orderTotal(o))}</div>
+             <div class="note">${o.qty ? Number(o.qty).toLocaleString('he-IL') + ' יח׳ · ' : ''}${STAGE_LABEL[orderStage(o)]}</div>`,
+    confirmText: 'מחק',
+  });
+  if (!ok) return;
+
+  /* נשמר המקום המדויק, כדי שהביטול יחזיר אותה לאותה שורה */
+  const idx = orders.findIndex(x => x.id === id);
+  const removed = orders[idx];
+  orders.splice(idx, 1);
   render();
-  showToast('ההזמנה נמחקה');
   saveToSheet();
+
+  showToastAction('ההזמנה נמחקה', 'בטל', () => {
+    orders.splice(idx, 0, removed);
+    render();
+    saveToSheet();
+    showToast('המחיקה בוטלה');
+  });
 }
 
 /* ---------------- toast ---------------- */
@@ -1838,6 +1883,51 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
+
+/* הודעה עם כפתור פעולה — משמשת ל"בטל" אחרי מחיקה */
+function showToastAction(msg, actionLabel, onAction, ms) {
+  const t = document.getElementById('toast');
+  t.innerHTML = '';
+  t.appendChild(document.createTextNode(msg + ' '));
+  const b = document.createElement('button');
+  b.textContent = actionLabel;
+  b.style.cssText = 'margin-inline-start:10px; border:none; background:var(--page); color:var(--text-primary);' +
+    'font:inherit; font-weight:700; padding:4px 12px; border-radius:8px; cursor:pointer;';
+  b.addEventListener('click', () => {
+    t.classList.remove('show');
+    clearTimeout(toastTimer);
+    onAction();
+  });
+  t.appendChild(b);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; }, ms || 7000);
+}
+
+/* ---------------- אישור פעולה ---------------- */
+const confirmOverlay = document.getElementById('confirmOverlay');
+let confirmResolve = null;
+
+function closeConfirm(result) {
+  confirmOverlay.classList.remove('open');
+  if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
+}
+
+/* מחזיר Promise שנפתר ל-true רק אם המשתמש אישר במפורש */
+function askConfirm({ title, message, detail, confirmText }) {
+  document.getElementById('confirmTitle').textContent = title || 'אישור';
+  document.getElementById('confirmMsg').textContent = message || '';
+  const d = document.getElementById('confirmDetail');
+  if (detail) { d.innerHTML = detail; d.style.display = 'block'; } else { d.style.display = 'none'; }
+  document.getElementById('confirmOk').textContent = confirmText || 'מחק';
+  confirmOverlay.classList.add('open');
+  return new Promise(res => { confirmResolve = res; });
+}
+
+document.getElementById('confirmOk').addEventListener('click', () => closeConfirm(true));
+document.getElementById('confirmCancel').addEventListener('click', () => closeConfirm(false));
+document.getElementById('confirmClose').addEventListener('click', () => closeConfirm(false));
+confirmOverlay.addEventListener('click', (e) => { if (e.target === confirmOverlay) closeConfirm(false); });
 
 /* ---------------- tabs ---------------- */
 document.getElementById('stageTabs').addEventListener('click', (e) => {
@@ -2142,6 +2232,8 @@ async function loadFromSheet(silent) {
         }
         return o;
       });
+    /* גיבוי של מה שבאמת יושב בגיליון — נקודת שחזור אמינה */
+    pushBackup(orders.slice());
     render();
     setSyncStatus('synced', `מסונכרן ✓ (${orders.length} הזמנות)`);
     return true;
@@ -2151,6 +2243,27 @@ async function loadFromSheet(silent) {
     if (!silent) showToast('לא הצלחתי להתחבר לגיליון — בדקי את הכתובת');
     return false;
   }
+}
+
+/* ---------------- גיבוי מקומי ----------------
+   לפני כל שמירה נשמר עותק של המצב, כדי שתמיד יהיה לאן לחזור
+   גם אם משהו נמחק בטעות. נשמרים חמשת האחרונים. */
+const BACKUP_KEY = 'fabricOrders.backups';
+
+function loadBackups() {
+  try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]'); } catch (e) { return []; }
+}
+
+function pushBackup(snapshot) {
+  if (!snapshot || !snapshot.length) return;   /* אין טעם לגבות מצב ריק */
+  try {
+    const list = loadBackups();
+    const last = list[0];
+    /* לא לשמור גיבוי זהה לקודם */
+    if (last && JSON.stringify(last.orders) === JSON.stringify(snapshot)) return;
+    list.unshift({ at: new Date().toISOString(), count: snapshot.length, orders: snapshot });
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(list.slice(0, 5)));
+  } catch (e) { /* אחסון מלא או חסום */ }
 }
 
 async function saveToSheet() {
@@ -2184,10 +2297,45 @@ async function saveToSheet() {
   }
 }
 
+function renderBackupList() {
+  const el = document.getElementById('backupList');
+  const list = loadBackups();
+  if (!list.length) {
+    el.innerHTML = '<span class="sub">עדיין אין גיבויים. הם נוצרים אוטומטית בכל טעינה מהגיליון.</span>';
+    return;
+  }
+  el.innerHTML = list.map((b, i) => `
+    <div class="arch-row" style="border-inline-start-color:var(--good); margin-bottom:6px;">
+      <span class="date">${new Date(b.at).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</span>
+      <span class="who">${b.count} הזמנות</span>
+      <span class="acts"><button data-i="${i}" title="שחזור">↩️</button></span>
+    </div>`).join('');
+
+  el.querySelectorAll('button[data-i]').forEach(btn => btn.addEventListener('click', async () => {
+    const b = loadBackups()[Number(btn.dataset.i)];
+    if (!b) return;
+    const ok = await askConfirm({
+      title: '↩️ שחזור מגיבוי',
+      message: 'הרשימה הנוכחית תוחלף בגיבוי, והשינוי יישמר גם בגיליון.',
+      detail: `<div class="k">גיבוי מ-${new Date(b.at).toLocaleString('he-IL')}</div>
+               <div class="v">${b.count} הזמנות</div>
+               <div class="note">כרגע ברשימה: ${orders.length}</div>`,
+      confirmText: 'שחזר',
+    });
+    if (!ok) return;
+    orders = b.orders.slice();
+    render();
+    saveToSheet();
+    settingsOverlay.classList.remove('open');
+    showToast(`שוחזרו ${b.count} הזמנות מהגיבוי`);
+  }));
+}
+
 document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('webappUrlInput').value = WEBAPP_URL;
   document.getElementById('vatRateInput').value = VAT_RATE;
   document.getElementById('versionLine').textContent = 'גרסה ' + APP_VERSION;
+  renderBackupList();
   settingsOverlay.classList.add('open');
 });
 document.getElementById('closeSettings').addEventListener('click', () => settingsOverlay.classList.remove('open'));
@@ -2921,6 +3069,7 @@ function renderQuotesHistory() {
       </span>
       <span class="sum">${fmtQ(q.grand)}</span>
       <span class="acts">
+        <button title="ההצעה אושרה — צור הזמנה" data-act="approve" style="color:var(--good);">✔️</button>
         <button title="פתיחה מחדש" data-act="open">↗️</button>
         <button title="שליחה בוואטסאפ" data-act="wa">💬</button>
         <button title="מחיקה מהארכיון" data-act="del">🗑️</button>
@@ -2932,6 +3081,7 @@ function renderQuotesHistory() {
       const q = savedQuotes.find(x => x.id === row.dataset.id);
       if (!q) return;
       if (b.dataset.act === 'del') return deleteSavedQuote(q.id);
+      if (b.dataset.act === 'approve') return approveQuote(q);
       restoreQuote(q);
       if (b.dataset.act === 'wa') {
         closeArchive();
@@ -2964,6 +3114,47 @@ function restoreQuote(q) {
   renderQuote();
   quoteOverlay.classList.add('open');
   setTimeout(fitQuotePreview, 60);
+}
+
+/* הצעה שאושרה הופכת להזמנה. הסכומים עוברים כפי שהם:
+   `amount` לפני מע״מ ו-`shippingCost` כולל מע״מ — בדיוק המודל של ההזמנה. */
+async function approveQuote(q) {
+  const existing = orders.find(o =>
+    String(o.name || '').trim().toLowerCase() === String(q.to || '').trim().toLowerCase() &&
+    Math.abs(orderProducts(o) - q.amount) < 0.01);
+
+  const ok = await askConfirm({
+    title: '✔️ ההצעה אושרה',
+    message: existing
+      ? 'כבר קיימת הזמנה זהה ללקוח הזה. ליצור בכל זאת הזמנה נוספת?'
+      : 'תיווצר הזמנה חדשה מנתוני ההצעה. ההצעה תישאר בארכיון.',
+    detail: `<div class="k">${escapeHtml(q.to || 'ללא נמען')}</div>
+             <div class="v">${fmtQ(q.grand)}</div>
+             <div class="note">${q.qty ? Number(q.qty).toLocaleString('he-IL') + ' יח׳ · ' : ''}${escapeHtml(q.item || '')}</div>`,
+    confirmText: existing ? 'צור בכל זאת' : 'צור הזמנה',
+  });
+  if (!ok) return;
+
+  orders.unshift({
+    id: cryptoId(),
+    name: q.to || '',
+    phone: '', email: '', address: '',
+    qty: q.qty || '',
+    unitPrice: q.unit || '',
+    amount: q.amount || 0,
+    shippingCost: q.shipping || 0,
+    allocationNumber: '',
+    payment: 'לא שולם',
+    checkDueDate: '', checkDetails: '',
+    deliveryStatus: 'לא נשלח',
+    deliveryDate: '', reminderDate: '',
+    notes: `נוצר מהצעת מחיר מ-${fmtDate(q.savedAt)}`,
+  });
+
+  render();
+  saveToSheet();
+  closeArchive();
+  showToast(`נוצרה הזמנה עבור ${q.to || 'הלקוח'}`);
 }
 
 function deleteSavedQuote(id) {
