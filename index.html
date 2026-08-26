@@ -1298,7 +1298,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.25 · 19';
+const APP_VERSION = '2026.08.25 · 20';
 
 let orders = [];
 let editingId = null;
@@ -2116,6 +2116,11 @@ function handleAuthError(json) {
   return false;
 }
 
+/* ⚠️ שמירה מוחקת את הגיליון וכותבת אותו מחדש. אם הטעינה הראשונית
+   נכשלה, `orders` ריק — ושמירה כזו הייתה מוחקת את כל ההזמנות.
+   הדגל הזה חוסם שמירה עד שטעינה אחת הצליחה. */
+let sheetLoadedOk = false;
+
 async function loadFromSheet(silent) {
   if (!WEBAPP_URL) return false;
   setSyncStatus('syncing', 'טוען מהגיליון...');
@@ -2123,6 +2128,7 @@ async function loadFromSheet(silent) {
     const json = await callSheet('load');
     if (handleAuthError(json)) { setSyncStatus('error', 'אין הרשאה'); return false; }
     if (!json || !json.ok) throw new Error('bad response');
+    sheetLoadedOk = true;
     orders = (json.rows || [])
       .filter(r => String(r['שם הלקוח'] || '').trim())
       .map((r, i) => {
@@ -2149,6 +2155,14 @@ async function loadFromSheet(silent) {
 
 async function saveToSheet() {
   if (!WEBAPP_URL) return;
+
+  /* בלי טעינה מוצלחת אין לדעת מה כבר קיים בגיליון — ושמירה תמחק אותו */
+  if (!sheetLoadedOk) {
+    setSyncStatus('error', 'לא נשמר — הגיליון לא נטען');
+    showToast('⚠️ הגיליון לא נטען, ולכן לא שמרתי כדי לא למחוק נתונים קיימים. רענן ונסה שוב.');
+    return;
+  }
+
   setSyncStatus('syncing', 'שומר בגיליון...');
   /* שלוש העמודות האלה מחושבות ואינן נשמרות במודל ההזמנה */
   const rows = orders.map(o => SHEET_HEADERS.map(h => {

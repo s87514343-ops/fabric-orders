@@ -127,10 +127,24 @@ function doPost(e) {
   return jsonOut({ ok: false, error: 'unknown_action' });
 }
 
-/* ---------- הזמנות: הגיליון הראשון ---------- */
+/* ---------- הזמנות ---------- */
+
+/**
+ * ⚠️ אין להשתמש ב-getSheets()[0] עבור ההזמנות.
+ * גיליון שנוצר אוטומטית (למשל "הצעות מחיר") עלול להיכנס במקום הראשון,
+ * ואז הקריאה והכתיבה היו פונות לגיליון הלא נכון — ומוחקות הזמנות.
+ * לכן נבחר הגיליון הראשון שאינו אחד הגיליונות הפנימיים.
+ */
+function ordersSheet() {
+  var sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getName() !== QUOTES_SHEET) return sheets[i];
+  }
+  return sheets[0];
+}
 
 function loadRows() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  var sheet = ordersSheet();
   var data = sheet.getDataRange().getValues();
   if (!data.length) return jsonOut({ ok: true, headers: [], rows: [] });
 
@@ -152,7 +166,15 @@ function saveRows(payload) {
   if (!lock.tryLock(20000)) return jsonOut({ ok: false, error: 'busy' });
 
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    var sheet = ordersSheet();
+
+    /* רשת ביטחון: בקשה ריקה מול גיליון שיש בו נתונים היא כמעט תמיד
+       תקלה בצד הלקוח, לא כוונה למחוק הכל. */
+    var existing = sheet.getLastRow();
+    if (rows.length === 0 && existing > 1) {
+      return jsonOut({ ok: false, error: 'refused_empty_overwrite', existingRows: existing - 1 });
+    }
+
     sheet.clearContents();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     if (rows.length > 0) {
@@ -167,11 +189,12 @@ function saveRows(payload) {
 
 /* ---------- ארכיון הצעות המחיר: גיליון נפרד ---------- */
 
-/* מחזיר את הגיליון לפי שם, ויוצר אותו אם אינו קיים */
+/* מחזיר את הגיליון לפי שם, ויוצר אותו **בסוף** אם אינו קיים.
+   בלי ציון המיקום, גיליון חדש עלול להידחף למקום הראשון. */
 function sheetByName(name) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(name);
-  if (!sh) sh = ss.insertSheet(name);
+  if (!sh) sh = ss.insertSheet(name, ss.getNumSheets());
   return sh;
 }
 
