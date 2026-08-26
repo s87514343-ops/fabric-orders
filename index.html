@@ -217,6 +217,12 @@
     animation: overlayIn .2s ease;
   }
   .overlay.open { display: flex; }
+  /* בזמן שחלון פתוח הרקע ננעל. בלי זה אפשר להזיז את הדף מתחת לחלון,
+     והוא נראה מוסט הצדה עם הטבלה מבצבצת מאחוריו. */
+  body.modal-open {
+    position: fixed; width: 100%; inset-inline: 0;
+    overflow: hidden; overscroll-behavior: none;
+  }
   @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes modalIn {
     from { opacity: 0; transform: translateY(24px) scale(.96); }
@@ -628,6 +634,8 @@
       background: #fff !important; margin: 0 !important; padding: 0 !important;
       width: 210mm !important; height: auto !important; overflow: visible !important;
     }
+    /* נעילת הרקע היא לתצוגה בלבד; בהדפסה היא הייתה מזיזה את הגיליון */
+    body.modal-open { position: static !important; top: auto !important; }
     body > *:not(#quoteOverlay) { display: none !important; }
 
     #quoteOverlay {
@@ -1319,7 +1327,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.26 · 21';
+const APP_VERSION = '2026.08.26 · 22';
 
 let orders = [];
 let editingId = null;
@@ -3435,6 +3443,30 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     location.reload();
   });
 }
+
+/* ---------------- נעילת הרקע בזמן חלון פתוח ----------------
+   נרשם על כל השכבות במקום בכל פונקציית פתיחה/סגירה בנפרד,
+   כך שאי אפשר לשכוח חלון חדש. */
+let lockedScrollY = 0;
+
+function setBodyLock(locked) {
+  const isLocked = document.body.classList.contains('modal-open');
+  if (locked && !isLocked) {
+    lockedScrollY = window.scrollY;
+    document.body.style.top = `-${lockedScrollY}px`;
+    document.body.classList.add('modal-open');
+  } else if (!locked && isLocked) {
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, lockedScrollY);
+  }
+}
+
+const overlayWatcher = new MutationObserver(() => {
+  setBodyLock(!!document.querySelector('.overlay.open, .gate.open'));
+});
+document.querySelectorAll('.overlay, .gate').forEach(el =>
+  overlayWatcher.observe(el, { attributes: true, attributeFilter: ['class'] }));
 
 /* ---------------- init ---------------- */
 /* מופעל אחרי שההזדהות עברה בהצלחה (או מיד, כשההזדהות כבויה) */
