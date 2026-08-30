@@ -97,6 +97,11 @@
   .sync-pill.error .dot { background: var(--critical); }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
   .cal-btn { color: var(--brand) !important; }
+  .alloc-link {
+    border: none; background: transparent; padding: 0; margin-top: 2px;
+    font: inherit; font-weight: 600; color: var(--critical); cursor: pointer;
+    text-align: start; text-decoration: underline; text-underline-offset: 2px;
+  }
   /* וואטסאפ — בצבע המותג שלהם, כדי שיזוהה מיד */
   .wa-btn { border-color: #25d366 !important; color: #128c3f !important; font-weight: 700; }
   .wa-btn:hover { background: #e7f8ee !important; }
@@ -949,8 +954,9 @@
         <div class="line grand"><span>סה״כ לתשלום</span><span id="sumGrand">₪0</span></div>
       </div>
       <div class="field full" id="allocationField" style="display:none;">
-        <label>מספר הקצאה (חובה מעל 5,900 ₪) *</label>
+        <label>מספר הקצאה (חובה מעל 5,900 ₪ כולל מע״מ) *</label>
         <input type="text" id="f_allocation" placeholder="מספר ההקצאה מרשות המסים">
+        <button class="btn small" id="openAllocSite" style="margin-top:8px;">🔗 פתיחת מערכת רשות המסים</button>
       </div>
       <div class="field">
         <label>שיטת תשלום</label>
@@ -1208,6 +1214,46 @@
   </div>
 </div>
 
+<div class="overlay" id="allocOverlay" style="z-index:65;">
+  <div class="modal stripe-warm" style="max-width:480px;">
+    <div class="modal-head">
+      <h2>🧾 בקשת מספר הקצאה</h2>
+      <button class="icon-btn" id="closeAlloc">✕</button>
+    </div>
+    <div class="modal-body" style="grid-template-columns:1fr;">
+      <div class="rep-card" id="allocDetail"></div>
+
+      <p class="install-note" style="margin:0;">
+        הזמנה מעל <strong id="allocThreshold"></strong> מחייבת מספר הקצאה מרשות המסים.
+        פתח את המערכת, הפק את המספר, והדבק אותו כאן — הוא יישמר בהזמנה.
+      </p>
+
+      <button class="btn primary" id="allocOpenSite" style="justify-content:center; min-height:48px;">
+        🔗 פתיחת מערכת רשות המסים
+      </button>
+
+      <div class="field full">
+        <label>מספר ההקצאה שהתקבל</label>
+        <input type="text" id="allocInput" placeholder="הדבק כאן את המספר">
+      </div>
+
+      <details style="font-size:13.5px; color:var(--text-secondary);">
+        <summary style="cursor:pointer; font-weight:600;">שינוי כתובת המערכת</summary>
+        <div class="field full" style="margin-top:9px;">
+          <input type="url" id="allocUrlInput" placeholder="https://...">
+          <p style="font-size:12.5px; color:var(--muted); margin:7px 0 0; line-height:1.6;">
+            הדבק כאן את הכתובת המדויקת שאתה נכנס אליה, והיא תישמר לפעמים הבאות.
+          </p>
+        </div>
+      </details>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="allocCancel">סגירה</button>
+      <button class="btn primary" id="allocSave">שמירת המספר</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="confirmOverlay" style="z-index:70;">
   <div class="modal stripe-warm" style="max-width:420px;">
     <div class="modal-head">
@@ -1327,7 +1373,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.26 · 22';
+const APP_VERSION = '2026.08.26 · 23';
 
 let orders = [];
 let editingId = null;
@@ -1451,7 +1497,7 @@ function computeAlerts() {
     /* חובת מספר הקצאה שלא מולאה */
     if (orderTotal(o) > ALLOCATION_THRESHOLD && !String(o.allocationNumber || '').trim()) {
       list.push({
-        sev: 'critical', icon: '⚠️', id: o.id, sort: -999,
+        sev: 'critical', icon: '⚠️', id: o.id, sort: -999, act: 'alloc',
         text: `חסר מספר הקצאה — ${who(o)}`, when: fmtCurrency(orderTotal(o)),
       });
     }
@@ -1473,7 +1519,7 @@ function renderAlerts() {
         <button class="btn small ghost" id="dismissAlerts">הסתר</button>
       </div>
       ${shown.map(a => `
-        <button class="alert-row ${a.sev}" data-id="${a.id}">
+        <button class="alert-row ${a.sev}" data-id="${a.id}" data-act="${a.act || 'open'}">
           <span class="ico">${a.icon}</span>
           <span class="txt">${escapeHtml(a.text)}</span>
           <span class="when">${escapeHtml(a.when)}</span>
@@ -1482,8 +1528,12 @@ function renderAlerts() {
         ? `<div class="alerts-more">ועוד ${list.length - shown.length} פריטים שדורשים טיפול</div>` : ''}
     </div>`;
 
+  /* התראה על הקצאה חסרה מובילה ישר לחלונית ההקצאה, לא לעריכת ההזמנה */
   panel.querySelectorAll('.alert-row').forEach(b =>
-    b.addEventListener('click', () => openModal(b.dataset.id)));
+    b.addEventListener('click', () => {
+      if (b.dataset.act === 'alloc') openAllocation(b.dataset.id);
+      else openModal(b.dataset.id);
+    }));
   document.getElementById('dismissAlerts').addEventListener('click', () => {
     alertsDismissed = true;
     renderAlerts();
@@ -1603,7 +1653,9 @@ function renderTable() {
         <td data-label="סה״כ" class="amount">
           ${fmtCurrency(orderTotal(o))}
           <div class="sub" style="font-weight:400;">מוצרים ${fmtCurrency(orderProducts(o))}${VAT_RATE > 0 ? ` + מע״מ ${fmtCurrency(orderVat(o))}` : ''}${orderShipping(o) > 0 ? ` + משלוח ${fmtCurrency(orderShipping(o))}` : ''}</div>
-          ${orderTotal(o) > ALLOCATION_THRESHOLD ? `<div class="sub" style="font-weight:600; color:${o.allocationNumber ? 'var(--muted)' : 'var(--critical)'};">${o.allocationNumber ? 'הקצאה: ' + escapeHtml(o.allocationNumber) : '⚠️ חסר מס׳ הקצאה'}</div>` : ''}
+          ${orderTotal(o) > ALLOCATION_THRESHOLD ? (o.allocationNumber
+            ? `<div class="sub" style="font-weight:600; color:var(--muted);">הקצאה: ${escapeHtml(o.allocationNumber)}</div>`
+            : `<button class="sub alloc-link" onclick="openAllocation('${o.id}')">⚠️ חסר מס׳ הקצאה — הפק</button>`) : ''}
         </td>
         <td data-label="תשלום">${paymentBadge}${checkInfo}</td>
         <td data-label="משלוח">${deliveryBadge}</td>
@@ -1783,6 +1835,10 @@ function backCalcFromTarget() {
   return true;
 }
 
+document.getElementById('openAllocSite').addEventListener('click', () => {
+  window.open(getAllocUrl(), '_blank');
+});
+
 document.getElementById('f_target').addEventListener('input', backCalcFromTarget);
 /* שינוי כמות כשיש יעד — היעד גובר והמחיר ליחידה מחושב מחדש */
 document.getElementById('f_qty').addEventListener('input', () => {
@@ -1911,6 +1967,71 @@ function showToastAction(msg, actionLabel, onAction, ms) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; }, ms || 7000);
 }
+
+/* ---------------- בקשת מספר הקצאה ----------------
+   הכתובת ניתנת לעריכה ונשמרת במכשיר: מערכת ההקצאה של רשות המסים
+   שינתה כתובות מאז שעלתה, ואין טעם לקבע כתובת בקוד. */
+const ALLOC_URL_KEY = 'fabricOrders.allocUrl';
+const ALLOC_URL_DEFAULT = 'https://www.gov.il/he/departments/israel_tax_authority';
+
+function getAllocUrl() {
+  try { return localStorage.getItem(ALLOC_URL_KEY) || ALLOC_URL_DEFAULT; }
+  catch (e) { return ALLOC_URL_DEFAULT; }
+}
+function setAllocUrl(u) {
+  try { u ? localStorage.setItem(ALLOC_URL_KEY, u) : localStorage.removeItem(ALLOC_URL_KEY); }
+  catch (e) { /* אחסון חסום */ }
+}
+
+const allocOverlay = document.getElementById('allocOverlay');
+let allocOrderId = null;
+
+function openAllocation(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) return;
+  allocOrderId = orderId;
+
+  document.getElementById('allocThreshold').textContent =
+    ALLOCATION_THRESHOLD.toLocaleString('he-IL') + ' ₪ (כולל מע״מ)';
+  document.getElementById('allocDetail').innerHTML = `
+    <div class="k">${escapeHtml(o.name || 'ללא שם')}</div>
+    <div class="v">${fmtCurrency(orderTotal(o))}</div>
+    <div class="note">מוצרים ${fmtCurrency(orderProducts(o))} + מע״מ ${fmtCurrency(orderVat(o))}${
+      orderShipping(o) ? ' + משלוח ' + fmtCurrency(orderShipping(o)) : ''}</div>`;
+  document.getElementById('allocInput').value = o.allocationNumber || '';
+  document.getElementById('allocUrlInput').value = getAllocUrl();
+
+  allocOverlay.classList.add('open');
+  setTimeout(() => document.getElementById('allocInput').focus(), 60);
+}
+
+function closeAllocation() { allocOverlay.classList.remove('open'); allocOrderId = null; }
+
+document.getElementById('closeAlloc').addEventListener('click', closeAllocation);
+document.getElementById('allocCancel').addEventListener('click', closeAllocation);
+allocOverlay.addEventListener('click', (e) => { if (e.target === allocOverlay) closeAllocation(); });
+
+document.getElementById('allocOpenSite').addEventListener('click', () => {
+  const typed = document.getElementById('allocUrlInput').value.trim();
+  if (typed) setAllocUrl(typed);
+  window.open(typed || getAllocUrl(), '_blank');
+});
+
+document.getElementById('allocSave').addEventListener('click', () => {
+  const num = document.getElementById('allocInput').value.trim();
+  const url = document.getElementById('allocUrlInput').value.trim();
+  if (url) setAllocUrl(url);
+  if (!num) { showToast('לא הוזן מספר הקצאה'); return; }
+
+  const idx = orders.findIndex(o => o.id === allocOrderId);
+  if (idx > -1) {
+    orders[idx].allocationNumber = num;
+    render();
+    saveToSheet();
+    showToast('מספר ההקצאה נשמר');
+  }
+  closeAllocation();
+});
 
 /* ---------------- אישור פעולה ---------------- */
 const confirmOverlay = document.getElementById('confirmOverlay');
