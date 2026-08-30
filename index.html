@@ -872,6 +872,7 @@
     <button class="btn" id="exportBtn">⬇️ ייצוא לאקסל</button>
     <button class="btn" id="blankQuoteBtn" title="הצעת מחיר ריקה">📄 הצעת מחיר</button>
     <button class="btn" id="archiveBtn" title="הצעות שנשלחו">📁 ארכיון הצעות</button>
+    <button class="btn" id="allocBtn" title="בקשת מספר הקצאה מרשות המסים">🧾 מספר הקצאה</button>
     <button class="btn primary" id="addBtn">＋ הזמנה חדשה</button>
   </div>
 
@@ -1227,6 +1228,10 @@
       <button class="icon-btn" id="closeAlloc">✕</button>
     </div>
     <div class="modal-body" style="grid-template-columns:1fr;">
+      <div class="field full">
+        <label>עבור איזו הזמנה?</label>
+        <select id="allocOrderSelect"></select>
+      </div>
       <div class="rep-card" id="allocDetail"></div>
 
       <p class="install-note" style="margin:0;">
@@ -1379,7 +1384,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.26 · 24';
+const APP_VERSION = '2026.08.26 · 25';
 
 let orders = [];
 let editingId = null;
@@ -2019,19 +2024,33 @@ function setAllocUrl(u) {
 const allocOverlay = document.getElementById('allocOverlay');
 let allocOrderId = null;
 
-function openAllocation(orderId) {
-  const o = orders.find(x => x.id === orderId);
-  if (!o) return;
-  allocOrderId = orderId;
+/* מציג את פרטי ההזמנה שנבחרה, או הסבר כשלא נבחרה אחת */
+function renderAllocDetail() {
+  const id = document.getElementById('allocOrderSelect').value;
+  allocOrderId = id || null;
+  const o = orders.find(x => x.id === id);
+  const detail = document.getElementById('allocDetail');
+  const saveBtn = document.getElementById('allocSave');
+  const numField = document.getElementById('allocInput').closest('.field');
+
+  if (!o) {
+    detail.innerHTML = `<div class="note" style="line-height:1.8;">
+      לא נבחרה הזמנה. אפשר לפתוח את מערכת רשות המסים ישירות,
+      ולחזור לכאן כשתרצה לשמור מספר להזמנה מסוימת.</div>`;
+    saveBtn.style.display = 'none';
+    numField.style.display = 'none';
+    return;
+  }
+
+  saveBtn.style.display = 'inline-flex';
+  numField.style.display = 'block';
 
   /* הטופס של רשות המסים מבקש את סכום העסקה לפני מע״מ ואת סכום המע״מ
      בנפרד — לכן הם מוצגים כאן מוכנים להעתקה. */
   const preVat = orderPreVat(o);
   const vatOnAll = orderTotal(o) - preVat;
 
-  document.getElementById('allocThreshold').textContent =
-    ALLOCATION_THRESHOLD.toLocaleString('he-IL') + ' ₪ לפני מע״מ';
-  document.getElementById('allocDetail').innerHTML = `
+  detail.innerHTML = `
     <div class="k">${escapeHtml(o.name || 'ללא שם')}</div>
     <div class="v">${fmtCurrency(orderTotal(o))}</div>
     <div class="note" style="margin-top:8px; line-height:1.9;">
@@ -2041,11 +2060,40 @@ function openAllocation(orderId) {
       <span style="color:var(--muted);">כולל דמי משלוח ${fmtCurrency(orderShipping(o))}</span>
     </div>`;
   document.getElementById('allocInput').value = o.allocationNumber || '';
+}
+
+/* orderId ריק פותח את החלונית במצב כללי — רק הקישור למערכת */
+function openAllocation(orderId) {
+  const sel = document.getElementById('allocOrderSelect');
+
+  /* קודם ההזמנות שחורגות מהסף, ואחריהן השאר — לשמירה ידנית */
+  const over = orders.filter(o => needsAllocation(o));
+  const rest = orders.filter(o => !needsAllocation(o));
+  sel.innerHTML = '<option value="">— ללא הזמנה, פתיחת המערכת בלבד —</option>'
+    + (over.length ? `<optgroup label="חורגות מהסף">${over.map(o =>
+        `<option value="${o.id}">${escapeHtml(o.name || 'ללא שם')} · ${fmtCurrency(orderTotal(o))}${
+          String(o.allocationNumber || '').trim() ? ' ✓' : ''}</option>`).join('')}</optgroup>` : '')
+    + (rest.length ? `<optgroup label="שאר ההזמנות">${rest.map(o =>
+        `<option value="${o.id}">${escapeHtml(o.name || 'ללא שם')} · ${fmtCurrency(orderTotal(o))}</option>`).join('')}</optgroup>` : '');
+
+  /* אם לא הועברה הזמנה — נבחרת הראשונה שחורגת וטרם קיבלה מספר */
+  const auto = over.find(o => !String(o.allocationNumber || '').trim());
+  sel.value = orderId || (auto ? auto.id : '');
+
+  document.getElementById('allocThreshold').textContent =
+    ALLOCATION_THRESHOLD.toLocaleString('he-IL') + ' ₪ לפני מע״מ';
   document.getElementById('allocUrlInput').value = getAllocUrl();
+  renderAllocDetail();
 
   allocOverlay.classList.add('open');
-  setTimeout(() => document.getElementById('allocInput').focus(), 60);
+  setTimeout(() => {
+    const inp = document.getElementById('allocInput');
+    if (inp.closest('.field').style.display !== 'none') inp.focus();
+  }, 60);
 }
+
+document.getElementById('allocOrderSelect').addEventListener('change', renderAllocDetail);
+document.getElementById('allocBtn').addEventListener('click', () => openAllocation(null));
 
 function closeAllocation() { allocOverlay.classList.remove('open'); allocOrderId = null; }
 
