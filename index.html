@@ -954,7 +954,7 @@
         <div class="line grand"><span>סה״כ לתשלום</span><span id="sumGrand">₪0</span></div>
       </div>
       <div class="field full" id="allocationField" style="display:none;">
-        <label>מספר הקצאה (חובה מעל 5,900 ₪ כולל מע״מ) *</label>
+        <label>מספר הקצאה <span id="allocLabelHint" style="font-weight:400; color:var(--muted);"></span> *</label>
         <input type="text" id="f_allocation" placeholder="מספר ההקצאה מרשות המסים">
         <button class="btn small" id="openAllocSite" style="margin-top:8px;">🔗 פתיחת מערכת רשות המסים</button>
       </div>
@@ -1020,6 +1020,12 @@
       <div class="field full">
         <label>כתובת ה-Web App (מהסקריפט בגיליון שלך)</label>
         <input type="url" id="webappUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div class="field full">
+        <label>סף מספר הקצאה (₪, לפני מע״מ)
+          <span style="font-weight:400; color:var(--muted);">— 5,000 ₪ נכון ל-2026. הסכום משתנה בחוק מעת לעת.</span>
+        </label>
+        <input type="number" id="allocThresholdInput" min="0" step="100">
       </div>
       <div class="field full">
         <label>🛟 גיבויים אוטומטיים <span style="font-weight:400; color:var(--muted);">— נשמרים בכל טעינה מהגיליון</span></label>
@@ -1373,7 +1379,7 @@
 <script>
 /* ---------------- data ---------------- */
 /* מזהה הגרסה — מוצג בהגדרות ובבדיקת ההתקנה, כדי לדעת מה באמת רץ במכשיר */
-const APP_VERSION = '2026.08.26 · 23';
+const APP_VERSION = '2026.08.26 · 24';
 
 let orders = [];
 let editingId = null;
@@ -1495,7 +1501,7 @@ function computeAlerts() {
       });
     }
     /* חובת מספר הקצאה שלא מולאה */
-    if (orderTotal(o) > ALLOCATION_THRESHOLD && !String(o.allocationNumber || '').trim()) {
+    if (needsAllocation(o) && !String(o.allocationNumber || '').trim()) {
       list.push({
         sev: 'critical', icon: '⚠️', id: o.id, sort: -999, act: 'alloc',
         text: `חסר מספר הקצאה — ${who(o)}`, when: fmtCurrency(orderTotal(o)),
@@ -1653,7 +1659,7 @@ function renderTable() {
         <td data-label="סה״כ" class="amount">
           ${fmtCurrency(orderTotal(o))}
           <div class="sub" style="font-weight:400;">מוצרים ${fmtCurrency(orderProducts(o))}${VAT_RATE > 0 ? ` + מע״מ ${fmtCurrency(orderVat(o))}` : ''}${orderShipping(o) > 0 ? ` + משלוח ${fmtCurrency(orderShipping(o))}` : ''}</div>
-          ${orderTotal(o) > ALLOCATION_THRESHOLD ? (o.allocationNumber
+          ${needsAllocation(o) ? (o.allocationNumber
             ? `<div class="sub" style="font-weight:600; color:var(--muted);">הקצאה: ${escapeHtml(o.allocationNumber)}</div>`
             : `<button class="sub alloc-link" onclick="openAllocation('${o.id}')">⚠️ חסר מס׳ הקצאה — הפק</button>`) : ''}
         </td>
@@ -1776,26 +1782,52 @@ function openModal(id) {
 }
 function closeModal() { overlay.classList.remove('open'); editingId = null; }
 
-const ALLOCATION_THRESHOLD = 5900;
+/* ---------------- סף מספר הקצאה ----------------
+   לפי רשות המסים: נדרש כשסכום העסקה *לפני מע״מ* גבוה מהסף.
+   הסף השתנה שלוש פעמים בשנתיים (20,000 ← 10,000 ← 5,000 מ-1.6.2026),
+   ולכן הוא ניתן לשינוי בהגדרות ולא מקובע בקוד. */
+const ALLOC_KEY = 'fabricOrders.allocThreshold';
+const ALLOC_DEFAULT = 5000;
+
+function loadAllocThreshold() {
+  try {
+    const v = localStorage.getItem(ALLOC_KEY);
+    return v === null ? ALLOC_DEFAULT : (Number(v) || ALLOC_DEFAULT);
+  } catch (e) { return ALLOC_DEFAULT; }
+}
+function persistAllocThreshold(v) {
+  try { localStorage.setItem(ALLOC_KEY, String(v)); } catch (e) { /* אחסון חסום */ }
+}
+let ALLOCATION_THRESHOLD = loadAllocThreshold();
+
+/* סכום העסקה לפני מע״מ: המוצרים כפי שהם, והמשלוח מנוקה מהמע״מ שכלול בו */
+function orderPreVat(o) {
+  return orderProducts(o) + orderShipping(o) / (1 + VAT_RATE / 100);
+}
+function needsAllocation(o) { return orderPreVat(o) > ALLOCATION_THRESHOLD; }
 
 /* קורא את סכומי הטופס. המוצרים לפני מע״מ, המשלוח כולל מע״מ. */
 function formTotals() {
   const products = Number(document.getElementById('f_amount').value) || 0;
   const shipping = Number(document.getElementById('f_shipping').value) || 0;
   const vat = products * (VAT_RATE / 100);
-  return { products, shipping, vat, productsWithVat: products + vat, grand: products + vat + shipping };
+  const preVat = products + shipping / (1 + VAT_RATE / 100);
+  return { products, shipping, vat, preVat, productsWithVat: products + vat, grand: products + vat + shipping };
 }
 
 /* מרענן את תיבת הסיכום ומחליט אם צריך מספר הקצאה.
    הסף נבדק לפי הסה״כ *כולל מע״מ* — זו הדרישה של רשות המסים. */
 function toggleAllocationField() {
-  const { products, shipping, vat, grand } = formTotals();
+  const { products, shipping, vat, preVat, grand } = formTotals();
   document.getElementById('sumProducts').textContent = fmtCurrency(products);
   document.getElementById('sumVatLabel').textContent = `מע״מ ${VAT_RATE.toLocaleString('he-IL')}%`;
   document.getElementById('sumVat').textContent = fmtCurrency(vat);
   document.getElementById('sumShipping').textContent = fmtCurrency(shipping);
   document.getElementById('sumGrand').textContent = fmtCurrency(grand);
-  document.getElementById('allocationField').style.display = grand > ALLOCATION_THRESHOLD ? 'block' : 'none';
+  /* הסף חל על סכום העסקה לפני מע״מ, לא על הסה״כ */
+  document.getElementById('allocLabelHint').textContent =
+    `(חובה מעל ${ALLOCATION_THRESHOLD.toLocaleString('he-IL')} ₪ לפני מע״מ · העסקה: ${preVat.toFixed(2)} ₪)`;
+  document.getElementById('allocationField').style.display = preVat > ALLOCATION_THRESHOLD ? 'block' : 'none';
 }
 document.getElementById('f_amount').addEventListener('input', toggleAllocationField);
 document.getElementById('f_shipping').addEventListener('input', toggleAllocationField);
@@ -1862,10 +1894,10 @@ document.getElementById('saveOrder').addEventListener('click', () => {
   const name = document.getElementById('f_name').value.trim();
   if (!name) { showToast('נא להזין שם לקוח'); document.getElementById('f_name').focus(); return; }
 
-  const { products: amountVal, shipping: shippingVal, grand: grandVal } = formTotals();
+  const { products: amountVal, shipping: shippingVal, preVat: preVatVal } = formTotals();
   const allocationNumber = document.getElementById('f_allocation').value.trim();
-  if (grandVal > ALLOCATION_THRESHOLD && !allocationNumber) {
-    showToast(`סה״כ כולל מע״מ מעל ${ALLOCATION_THRESHOLD.toLocaleString('he-IL')} ₪ — חובה להזין מספר הקצאה`);
+  if (preVatVal > ALLOCATION_THRESHOLD && !allocationNumber) {
+    showToast(`סכום העסקה לפני מע״מ מעל ${ALLOCATION_THRESHOLD.toLocaleString('he-IL')} ₪ — חובה להזין מספר הקצאה`);
     document.getElementById('f_allocation').focus();
     return;
   }
@@ -1972,7 +2004,8 @@ function showToastAction(msg, actionLabel, onAction, ms) {
    הכתובת ניתנת לעריכה ונשמרת במכשיר: מערכת ההקצאה של רשות המסים
    שינתה כתובות מאז שעלתה, ואין טעם לקבע כתובת בקוד. */
 const ALLOC_URL_KEY = 'fabricOrders.allocUrl';
-const ALLOC_URL_DEFAULT = 'https://www.gov.il/he/departments/israel_tax_authority';
+/* דף השירות הרשמי, אומת מול gov.il */
+const ALLOC_URL_DEFAULT = 'https://www.gov.il/he/service/request-assignment-number-for-tax-invoice';
 
 function getAllocUrl() {
   try { return localStorage.getItem(ALLOC_URL_KEY) || ALLOC_URL_DEFAULT; }
@@ -1991,13 +2024,22 @@ function openAllocation(orderId) {
   if (!o) return;
   allocOrderId = orderId;
 
+  /* הטופס של רשות המסים מבקש את סכום העסקה לפני מע״מ ואת סכום המע״מ
+     בנפרד — לכן הם מוצגים כאן מוכנים להעתקה. */
+  const preVat = orderPreVat(o);
+  const vatOnAll = orderTotal(o) - preVat;
+
   document.getElementById('allocThreshold').textContent =
-    ALLOCATION_THRESHOLD.toLocaleString('he-IL') + ' ₪ (כולל מע״מ)';
+    ALLOCATION_THRESHOLD.toLocaleString('he-IL') + ' ₪ לפני מע״מ';
   document.getElementById('allocDetail').innerHTML = `
     <div class="k">${escapeHtml(o.name || 'ללא שם')}</div>
     <div class="v">${fmtCurrency(orderTotal(o))}</div>
-    <div class="note">מוצרים ${fmtCurrency(orderProducts(o))} + מע״מ ${fmtCurrency(orderVat(o))}${
-      orderShipping(o) ? ' + משלוח ' + fmtCurrency(orderShipping(o)) : ''}</div>`;
+    <div class="note" style="margin-top:8px; line-height:1.9;">
+      <strong>למילוי בטופס:</strong><br>
+      סכום העסקה לפני מע״מ: <strong>${preVat.toFixed(2)} ₪</strong><br>
+      סכום המע״מ: <strong>${vatOnAll.toFixed(2)} ₪</strong><br>
+      <span style="color:var(--muted);">כולל דמי משלוח ${fmtCurrency(orderShipping(o))}</span>
+    </div>`;
   document.getElementById('allocInput').value = o.allocationNumber || '';
   document.getElementById('allocUrlInput').value = getAllocUrl();
 
@@ -2463,6 +2505,7 @@ function renderBackupList() {
 document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('webappUrlInput').value = WEBAPP_URL;
   document.getElementById('vatRateInput').value = VAT_RATE;
+  document.getElementById('allocThresholdInput').value = ALLOCATION_THRESHOLD;
   document.getElementById('versionLine').textContent = 'גרסה ' + APP_VERSION;
   renderBackupList();
   settingsOverlay.classList.add('open');
@@ -2505,6 +2548,13 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async () =>
   if (!isNaN(rate) && rate >= 0 && rate <= 100 && rate !== VAT_RATE) {
     VAT_RATE = rate;
     persistVatRate(rate);
+    render();
+  }
+
+  const thr = Number(document.getElementById('allocThresholdInput').value);
+  if (!isNaN(thr) && thr >= 0 && thr !== ALLOCATION_THRESHOLD) {
+    ALLOCATION_THRESHOLD = thr;
+    persistAllocThreshold(thr);
     render();
   }
 
