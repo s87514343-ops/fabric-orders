@@ -15,7 +15,9 @@
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+  integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
@@ -1401,12 +1403,12 @@ function fmtPhone(p) {
   let digits = String(p).replace(/\D/g, '');
   if (digits.length === 9 && !digits.startsWith('0')) digits = '0' + digits;
   if (digits.length === 10) return digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
-  return String(p);
+  return escapeHtml(String(p)); // unrecognized shape — value may come from an imported file; never return it raw into HTML
 }
 function fmtDate(d) {
   if (!d) return '—';
   const dt = new Date(d);
-  if (isNaN(dt)) return d;
+  if (isNaN(dt)) return escapeHtml(String(d)); // unparsable — same reasoning as fmtPhone above
   return dt.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 function daysUntil(d) {
@@ -1658,7 +1660,7 @@ function renderTable() {
           <div class="sub">${fmtPhone(o.phone)}${o.email ? ' · ' + escapeHtml(o.email) : ''}</div>
         </td>
         <td data-label="כמות">
-          ${o.qty ?? '—'}
+          ${escapeHtml(o.qty ?? '—')}
           ${o.unitPrice ? `<div class="sub" style="font-weight:400;">מחיר ליח׳: ${fmtQ(o.unitPrice)}</div>` : ''}
         </td>
         <td data-label="סה״כ" class="amount">
@@ -2172,13 +2174,19 @@ themeToggle.addEventListener('click', () => {
 });
 
 /* ---------------- export ---------------- */
+function sanitizeCell(v) {
+  // Neutralize CSV/Excel formula injection: a cell starting with = + - @ (or tab/CR)
+  // is interpreted as a formula by Excel/LibreOffice when the file is later opened.
+  if (typeof v !== 'string') return v;
+  return /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+}
 document.getElementById('exportBtn').addEventListener('click', () => {
   const headers = ['שם הלקוח','טלפון','כתובת','אימייל','כמות','מחיר ליחידה','סכום לתשלום','דמי משלוח','סכום ביניים (לפני מע״מ)',`מע״מ ${VAT_RATE}%`,'סה״כ לתשלום','מספר הקצאה','שיטת תשלום(מזומן/העברה/צק/לא שולם)','תאריך פרעון הצ׳ק','פרטי הצ׳ק','סטטוס משלוח (נשלח/לא נשלח)','תאריך משלוח','תאריך תזכורת ','הערות','שלב'];
   const rows = orders.map(o => [
     o.name, o.phone, o.address, o.email, o.qty, o.unitPrice, o.amount, orderShipping(o),
     orderSubtotal(o), Math.round(orderVat(o) * 100) / 100, Math.round(orderTotal(o) * 100) / 100,
     o.allocationNumber, o.payment, o.checkDueDate, o.checkDetails, o.deliveryStatus, o.deliveryDate, o.reminderDate, o.notes, STAGE_LABEL[orderStage(o)]
-  ]);
+  ].map(sanitizeCell));
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'הזמנות');
@@ -2788,7 +2796,7 @@ document.getElementById('exportReportBtn').addEventListener('click', () => {
     [],
     ['לקוח', 'מספר הזמנות', 'סה״כ'],
     ...groupBy(orders, o => (o.name || '').trim()).map(c => [c.key, c.count, c.sum]),
-  ];
+  ].map(row => row.map(sanitizeCell));
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'דוח');
