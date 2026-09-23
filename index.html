@@ -15,7 +15,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
   integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -518,121 +518,178 @@
   .quote-scaler { transform-origin: top center; }
   .quote-sheet {
     --q-blue:  #555b89;   /* כחול הלוגו */
-    --q-deep:  #3d4470;
-    --q-rose:  #de5f95;
-    --q-tint:  #eef1f8;
-    --q-ink:   #2c2c2c;
+    --q-deep:  #343a66;
+    --q-rose:  #d9568e;
+    --q-tint:  #f5f6fb;
+    --q-line:  #e4e7f1;
+    --q-ink:   #2a2d3a;
+    --q-muted: #6b6f80;
     position: relative; width: 210mm; height: 297mm; flex: none;
     overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-    background: linear-gradient(180deg, #dde3f1 0%, #eef1f8 6%, #ffffff 22%, #ffffff 78%, #f4f6fb 100%);
-    font-family: 'Frank Ruhl Libre', 'Rubik', serif;
+    background: #fff;
+    --q-display: 'Heebo', 'Rubik', sans-serif;
+    --q-display-w: 800;
+    --q-body: 'Heebo', 'Rubik', sans-serif;
+    font-family: var(--q-body);
+    font-size: 11pt; line-height: 1.5;
     color: var(--q-ink); direction: rtl; text-align: right;
   }
-  /* פסי הגרפיקה מהמיתוג */
-  .qs-band { position: absolute; inset-inline: 0; width: 100%; display: block; }
-  /* הפס העליון מתחיל מתחת לגוש המיתוג, כדי שהטקסט לא יישב על הגרפיקה */
-  .qs-band-top { top: 25mm; height: 22mm; object-fit: cover; object-position: center 58%; }
-  .qs-band-bottom { bottom: 0; height: 22mm; object-fit: cover; object-position: center 42%; }
 
-  .qs-brand { position: absolute; top: 6mm; inset-inline: 0; text-align: center; }
+  /* ---- כותרת: תמונת המיתוג לכל הרוחב, דוהה אל הלבן ---- */
+  .qs-hero { position: absolute; top: 0; left: 0; right: 0; height: 50mm; overflow: hidden; }
+  .qs-hero img { width: 100%; height: 100%; object-fit: cover; object-position: center 52%; display: block; }
+  .qs-hero::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0) 45%, rgba(255,255,255,.8) 82%, #fff 100%);
+  }
+  .qs-foot { position: absolute; bottom: 0; left: 0; right: 0; height: 24mm; overflow: hidden; }
+  .qs-foot img { width: 100%; height: 100%; object-fit: cover; object-position: center 45%; display: block; }
+  .qs-foot::before {
+    content: ''; position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0) 60%);
+  }
+
+  /* כרטיס הלוגו יושב על צד הגלים, כך שהפרחים נשארים גלויים */
+  .qs-brand {
+    position: absolute; top: 9mm; left: 13mm; z-index: 2;
+    padding: 4.5mm 8mm 4mm; text-align: center;
+    background: rgba(255,255,255,.9); border-radius: 3mm;
+    box-shadow: 0 2mm 7mm rgba(52,58,102,.14);
+  }
   .qs-logo {
-    font-family: 'Rubik', sans-serif; font-weight: 800; font-size: 27pt; line-height: 1;
-    color: var(--q-blue); letter-spacing: .04em;
-    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 2px 4px rgba(85,91,137,.28);
+    font-family: var(--q-display); font-weight: var(--q-display-w); font-size: 38pt; line-height: 1;
+    color: var(--q-deep); letter-spacing: .03em;
+  }
+  .qs-logo-rule {
+    width: 24mm; height: 1.5px; margin: 2.2mm auto 1.8mm;
+    background: linear-gradient(90deg, rgba(217,86,142,0), var(--q-rose), rgba(217,86,142,0));
   }
   .qs-tagline {
-    font-family: 'Rubik', sans-serif; font-size: 9pt; font-weight: 500;
-    color: var(--q-deep); margin-top: 1.5mm; letter-spacing: .01em;
+    font-family: var(--q-body); font-size: 8.5pt; font-weight: 600;
+    color: var(--q-blue); letter-spacing: .03em;
   }
-  .qs-contact {
-    position: absolute; bottom: 9mm; inset-inline: 12mm; text-align: center;
-    font-family: 'Rubik', sans-serif; font-size: 8pt; color: var(--q-deep);
-    line-height: 1.5;
+  .qs-bsd {
+    position: absolute; top: 5mm; right: 9mm; z-index: 2;
+    font-size: 9.5pt; font-weight: 700; color: var(--q-deep);
+    background: rgba(255,255,255,.85); padding: .5mm 2.6mm; border-radius: 99px;
   }
 
+  .qs-contact {
+    position: absolute; bottom: 26mm; left: 15mm; right: 15mm; text-align: center;
+    font-family: var(--q-body); font-size: 8pt; color: var(--q-blue); line-height: 1.5;
+    padding-top: 2.2mm; border-top: 1px solid var(--q-line);
+  }
+  .qs-contact:empty { display: none; }
+
   .qs-content {
-    position: absolute; top: 65mm; bottom: 29mm; right: 14mm; left: 14mm;
+    position: absolute; top: 51mm; bottom: 36mm; right: 15mm; left: 15mm;
     display: flex; flex-direction: column;
   }
   /* בלי זה הדפדפן מכווץ את הפריטים כשאין מקום: הטקסט נדחס והחריגה
      נעלמת, כך שאי אפשר גם לזהות אותה. עדיף שתהיה גלויה ותתריע. */
   .qs-content > * { flex-shrink: 0; }
 
-  .qs-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5pt; }
-  .qs-top .bsd { font-weight: 700; }
-  .qs-top .dates { color: #5a5a5a; font-size: 10.5pt; }
-  .qs-top .dates span + span::before { content: '·'; margin: 0 7px; color: var(--q-rose); }
+  /* ---- נמען ותאריך ---- */
+  .qs-meta {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm;
+    padding-bottom: 3mm; border-bottom: 1px solid var(--q-line);
+  }
+  .qs-meta .lbl {
+    display: block; font-family: var(--q-body); font-size: 8pt; font-weight: 700;
+    color: var(--q-rose); letter-spacing: .06em; margin-bottom: 1mm;
+  }
+  .qs-to .who { font-family: var(--q-display); font-size: 19pt; font-weight: var(--q-display-w); color: var(--q-deep); line-height: 1.15; }
+  .qs-dates { text-align: left; font-size: 10.5pt; color: var(--q-muted); }
+  #qsHeb:not(:empty) + #qsGreg::before { content: '·'; margin: 0 6px; color: var(--q-rose); }
 
-  .qs-to { margin-top: 22pt; font-size: 12pt; line-height: 1.5; }
-  .qs-to .lbl { color: #6a6a6a; }
-  .qs-to .who { font-weight: 700; font-size: 13.5pt; }
-
-  .qs-title { text-align: center; margin: 28pt 0 11pt; }
+  /* ---- כותרת ההצעה ---- */
+  .qs-title { text-align: center; margin: 6mm 0 3.5mm; }
   .qs-title h2 {
-    display: inline-block; margin: 0; padding: 0 14pt 4pt;
-    font-size: 16pt; font-weight: 900; color: var(--q-blue);
-    border-bottom: 2px solid var(--q-rose); letter-spacing: .01em;
+    margin: 0; font-family: var(--q-display); font-size: 29pt; font-weight: var(--q-display-w); line-height: 1.1;
+    color: var(--q-deep); letter-spacing: .01em;
+  }
+  .qs-orn { display: flex; align-items: center; justify-content: center; gap: 2.5mm; margin-top: 2mm; }
+  .qs-orn i { display: block; width: 18mm; height: 1px; }
+  .qs-orn i:first-child { background: linear-gradient(90deg, #c4c9de, rgba(196,201,222,0)); }
+  .qs-orn i:last-child  { background: linear-gradient(90deg, rgba(196,201,222,0), #c4c9de); }
+  .qs-orn b { display: block; width: 1.8mm; height: 1.8mm; background: var(--q-rose); transform: rotate(45deg); }
+
+  .qs-intro {
+    font-size: 11.5pt; line-height: 1.7; margin: 0 0 4.5mm; padding: 0 5mm;
+    text-align: center; color: #3b3f4f;
   }
 
-  .qs-intro { font-size: 11.5pt; line-height: 1.7; margin: 0 0 9pt; text-align: justify; }
-
-  .qs-sec { margin-bottom: 7pt; }
-  .qs-sec h3 {
-    margin: 0 0 5pt; font-size: 12.5pt; font-weight: 700; color: var(--q-blue);
-    display: flex; align-items: center; gap: 7pt;
+  /* ---- תיאור המוצר / הלכה וכשרות — שני כרטיסים זה לצד זה ---- */
+  .qs-secs { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-bottom: 5mm; }
+  .qs-sec {
+    background: var(--q-tint); border-radius: 3mm; padding: 3.4mm 5mm 3mm;
+    border-top: 2px solid var(--q-rose);
   }
-  .qs-sec h3::before {
-    content: ''; width: 4pt; height: 13pt; border-radius: 2pt;
-    background: var(--q-rose); flex: none;
-  }
+  .qs-sec h3 { margin: 0 0 1.8mm; font-size: 12.5pt; font-weight: 700; color: var(--q-deep); letter-spacing: .01em; }
   .qs-sec ul { margin: 0; padding: 0; list-style: none; }
   .qs-sec li {
-    font-size: 11.5pt; line-height: 1.55; padding-inline-start: 15pt; position: relative;
+    font-size: 10.5pt; line-height: 1.5; color: #34384a;
+    padding-inline-start: 4.2mm; position: relative;
   }
+  .qs-sec li + li { margin-top: .6mm; }
   .qs-sec li::before {
-    content: '◆'; position: absolute; inset-inline-start: 0; top: 0;
-    color: var(--q-rose); font-size: 7pt; line-height: 2.6;
+    content: ''; position: absolute; inset-inline-start: 0; top: .66em;
+    width: 1.4mm; height: 1.4mm; background: var(--q-rose); transform: rotate(45deg);
   }
 
+  /* ---- טבלת המחיר ---- */
   /* הטבלה עטופה ב-div: פריט flex ישיר עובר blockification והפריסה נשברת */
-  .qs-table-wrap { margin: 2pt 0 5pt; }
-  .qs-table { width: 100%; border-collapse: collapse; font-size: 11.5pt; }
+  .qs-table-wrap { margin: 0 0 3mm; }
+  .qs-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11pt; }
   .qs-table thead th {
-    background: var(--q-blue); color: #fff; font-weight: 700; font-size: 11pt;
-    padding: 7pt 10pt; text-align: center; border: none; letter-spacing: .01em;
+    background: var(--q-deep); color: #fff; border: none;
+    font-family: var(--q-body); font-weight: 700; font-size: 9.5pt; letter-spacing: .04em;
+    padding: 2.3mm 4mm; text-align: center;
   }
-  .qs-table thead th:first-child { text-align: right; }
-  .qs-table thead th:last-child { text-align: left; }
+  .qs-table thead th:first-child { text-align: right; border-start-start-radius: 2.5mm; }
+  .qs-table thead th:last-child  { text-align: left;  border-start-end-radius: 2.5mm; }
 
   .qs-table tbody td {
-    padding: 7pt 10pt; border-bottom: 1px solid #e3e7f2;
+    padding: 2.8mm 4mm; border-bottom: 1px solid var(--q-line);
     text-align: center; vertical-align: middle;
   }
-  .qs-table tbody td:first-child { text-align: right; font-weight: 500; }
-  .qs-table tbody td:last-child { text-align: left; font-weight: 700; }
+  .qs-table tbody td:first-child { text-align: right; font-weight: 700; color: var(--q-deep); font-size: 12pt; }
+  .qs-table tbody td:last-child  { text-align: left; font-weight: 700; }
   .qs-table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   /* שורות הסיכום — התווית צמודה לסכום ולא נדחקת לקצה הנגדי */
-  .qs-table tbody tr.vat td { background: #f7f9fd; color: #4a4a4a; font-size: 11pt; }
-  .qs-table tbody tr.vat td:first-child { text-align: left; padding-inline-end: 0; font-weight: 500; }
-  .qs-table tbody tr.vat.first td { border-top: 1.5px solid #c8d1e6; }
+  .qs-table tbody tr.vat td { border-bottom: none; padding-top: 1mm; padding-bottom: 1mm; color: var(--q-muted); font-size: 10.5pt; }
+  .qs-table tbody tr.vat td:first-child { text-align: left; padding-inline-end: 0; font-weight: 500; color: var(--q-muted); font-size: 10.5pt; }
+  .qs-table tbody tr.vat td:last-child { color: var(--q-ink); font-weight: 600; }
+  .qs-table tbody tr.vat.first td { padding-top: 2.4mm; }
+  .qs-table tbody tr.vat:last-child td { padding-bottom: 2.4mm; }
 
   .qs-table tfoot td {
-    padding: 9pt 10pt; background: var(--q-tint); color: var(--q-deep);
-    font-weight: 900; font-size: 13.5pt; border-top: 2.5px solid var(--q-rose);
+    padding: 3mm 4mm; background: var(--q-deep); color: #fff;
+    box-shadow: inset 0 2.5px 0 var(--q-rose);
   }
-  .qs-table tfoot td:first-child { text-align: left; padding-inline-end: 0; }
-  .qs-table tfoot td:last-child { text-align: left; }
-
-  .qs-note {
-    font-size: 10pt; color: #6a6a6a; line-height: 1.6; margin: 0;
-    padding-inline-start: 9pt; border-inline-start: 2px solid var(--q-tint);
+  .qs-table tfoot td:first-child {
+    text-align: left; padding-inline-end: 0; font-size: 12pt; font-weight: 600;
+    border-end-start-radius: 2.5mm;
+  }
+  .qs-table tfoot td:last-child {
+    text-align: left; font-size: 17pt; font-weight: 800; border-end-end-radius: 2.5mm;
   }
 
-  .qs-sign { margin-top: auto; padding-top: 5pt; text-align: left; font-size: 11.5pt; line-height: 1.6; }
-  .qs-sign .lbl { color: #6a6a6a; }
-  .qs-sign .nm { font-weight: 700; font-size: 12.5pt; color: var(--q-blue); }
-  .qs-sign .tel { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .qs-note { font-size: 10pt; color: var(--q-muted); line-height: 1.6; margin: 0 0 3mm; text-align: center; }
+
+  /* ---- פרטי יצירת קשר ---- */
+  .qs-sign {
+    margin-top: auto; align-self: center; text-align: center;
+    padding: 2.2mm 12mm 2.4mm; border: 1px solid var(--q-line); border-radius: 3mm; background: #fff;
+  }
+  .qs-sign .lbl {
+    display: block; font-family: var(--q-body); font-size: 8pt; font-weight: 700;
+    color: var(--q-rose); letter-spacing: .06em; margin-bottom: .8mm;
+  }
+  .qs-sign .nm { font-family: var(--q-display); font-weight: var(--q-display-w); font-size: 16pt; color: var(--q-deep); }
+  .qs-sign .tel { font-size: 12pt; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .02em; color: var(--q-ink); }
+  .qs-sign .tel:not(:empty)::before { content: '•'; color: var(--q-rose); margin: 0 3mm; }
 
   /* ============ print ============ */
   @media print {
@@ -1167,52 +1224,60 @@
       <div class="quote-preview-wrap" id="quotePreviewWrap">
         <div class="quote-scaler" id="quoteScaler">
           <div class="quote-sheet" id="quoteSheet">
-            <img class="qs-band qs-band-top" src="q-head.jpg" alt="">
-            <img class="qs-band qs-band-bottom" src="q-foot.jpg" alt="">
+            <div class="qs-hero"><img src="q-head.jpg" alt=""></div>
+            <div class="qs-foot"><img src="q-foot.jpg" alt=""></div>
+            <div class="qs-bsd">בס"ד</div>
             <div class="qs-brand">
               <div class="qs-logo">עדי צח</div>
+              <div class="qs-logo-rule"></div>
               <div class="qs-tagline">בדי בדיקה עדינים ואיכותיים עם שובלים</div>
             </div>
             <div class="qs-contact" id="qsContactLine"></div>
             <div class="qs-content">
-              <div class="qs-top">
-                <span class="bsd">בס"ד</span>
-                <span class="dates"><span id="qsHeb"></span><span id="qsGreg"></span></span>
+              <div class="qs-meta">
+                <div class="qs-to">
+                  <span class="lbl">לכבוד</span>
+                  <div class="who" id="qsTo"></div>
+                </div>
+                <div class="qs-dates">
+                  <span class="lbl">תאריך</span>
+                  <span><span id="qsHeb"></span><span id="qsGreg"></span></span>
+                </div>
               </div>
-              <div class="qs-to">
-                <div class="lbl">לכבוד</div>
-                <div class="who" id="qsTo"></div>
+              <div class="qs-title">
+                <h2 id="qsSubject"></h2>
+                <div class="qs-orn"><i></i><b></b><i></i></div>
               </div>
-              <div class="qs-title"><h2 id="qsSubject"></h2></div>
               <p class="qs-intro" id="qsIntro"></p>
-              <div class="qs-sec">
-                <h3>תיאור המוצר</h3>
-                <ul id="qsProduct"></ul>
-              </div>
-              <div class="qs-sec">
-                <h3>הלכה וכשרות</h3>
-                <ul id="qsKosher"></ul>
+              <div class="qs-secs">
+                <div class="qs-sec">
+                  <h3>תיאור המוצר</h3>
+                  <ul id="qsProduct"></ul>
+                </div>
+                <div class="qs-sec">
+                  <h3>הלכה וכשרות</h3>
+                  <ul id="qsKosher"></ul>
+                </div>
               </div>
               <div class="qs-table-wrap">
                 <table class="qs-table">
                   <colgroup>
-                    <col style="width:43%"><col style="width:13%">
-                    <col style="width:20%"><col style="width:24%">
+                    <col style="width:49%"><col style="width:13%">
+                    <col style="width:20%"><col style="width:18%">
                   </colgroup>
                   <thead>
                     <tr><th>פריט</th><th>כמות</th><th>מחיר ליח׳</th><th>סכום</th></tr>
                   </thead>
                   <tbody id="qsRows"></tbody>
                   <tfoot>
-                    <tr><td colspan="3">סה״כ לתשלום · כולל מע״מ</td><td class="num" id="qsGrand"></td></tr>
+                    <tr><td colspan="3" id="qsGrandLabel">סה״כ לתשלום · כולל מע״מ</td><td class="num" id="qsGrand"></td></tr>
                   </tfoot>
                 </table>
               </div>
               <p class="qs-note" id="qsNote"></p>
               <div class="qs-sign">
-                <span class="lbl">להזמנות:</span>
-                <span class="nm" id="qsContact"></span><br>
-                <span class="tel" id="qsPhone"></span>
+                <span class="lbl">להזמנות</span>
+                <span class="nm" id="qsContact"></span><span class="tel" id="qsPhone"></span>
               </div>
             </div>
           </div>
@@ -3002,6 +3067,8 @@ function renderQuote() {
 
   document.getElementById('qsRows').innerHTML = rows;
   document.getElementById('qsGrand').textContent = fmtQ(grand);
+  /* בהצעה פטורה ממע״מ אין לכתוב "כולל מע״מ" */
+  document.getElementById('qsGrandLabel').textContent = rate > 0 ? 'סה״כ לתשלום · כולל מע״מ' : 'סה״כ לתשלום';
 
   /* setTimeout ולא requestAnimationFrame: rAF אינו נורה כשהדף אינו מצויר
      (טאב מוסתר, חלון ממוזער), והבדיקה הייתה נדלגת. */
