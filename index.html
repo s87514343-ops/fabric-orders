@@ -1566,6 +1566,7 @@ function renderTabCounts() {
 function renderStats() {
   const total = orders.length;
   const totalAmount = orders.reduce((s,o) => s + orderTotal(o), 0);
+  const totalVat = orders.reduce((s,o) => s + orderVat(o), 0);
   const unpaidAmount = orders.filter(o => !isPaid(o)).reduce((s,o) => s + orderTotal(o), 0);
   const pendingDeliveries = orders.filter(o => o.deliveryStatus !== 'נשלח').length;
   const upcomingReminders = orders.filter(o => {
@@ -1575,7 +1576,8 @@ function renderStats() {
 
   const stats = [
     { label: 'סה״כ הזמנות', value: total, color: 'var(--brand)', icon: '📦' },
-    { label: 'סכום כולל (כולל מע״מ)', value: fmtCurrency(totalAmount), color: 'var(--aqua)', icon: '₪' },
+    { label: 'סכום כולל (כולל מע״מ)', value: fmtCurrency(totalAmount), color: 'var(--aqua)', icon: '₪',
+      sub: VAT_RATE > 0 ? `מזה מע״מ: ${fmtCurrency(totalVat)}` : '' },
     { label: 'טרם שולם', value: fmtCurrency(unpaidAmount), color: 'var(--critical)', icon: '⚠️' },
     { label: 'ממתין למשלוח', value: pendingDeliveries, color: 'var(--warning)', icon: '🚚' },
     { label: 'תזכורות השבוע', value: upcomingReminders, color: 'var(--brand)', icon: '⏰' },
@@ -1585,6 +1587,7 @@ function renderStats() {
     <div class="stat" style="--accent:${s.color}">
       <div class="label"><span class="stat-icon">${s.icon}</span>${s.label}</div>
       <div class="value">${s.value}</div>
+      ${s.sub ? `<div class="sub" style="margin-top:4px; font-weight:600;">${s.sub}</div>` : ''}
     </div>
   `).join('');
 }
@@ -1605,6 +1608,11 @@ function renderTable() {
     if (deliveryFilter && o.deliveryStatus !== deliveryFilter) return false;
     return true;
   });
+
+  /* סדר קבוע: קודם מה שלא נשלח, אחר כך נשלח ולא שולם, ולבסוף שולם ונשלח.
+     סדר יציב (stable sort) — בתוך כל שלב נשמר הסדר המקורי. */
+  const STAGE_ORDER = { pending: 0, unpaid: 1, done: 2 };
+  filtered.sort((a, b) => STAGE_ORDER[orderStage(a)] - STAGE_ORDER[orderStage(b)]);
 
   const tbody = document.getElementById('tableBody');
   const emptyState = document.getElementById('emptyState');
