@@ -951,6 +951,10 @@
         </label>
         <input type="number" id="f_target" min="0" step="0.5" placeholder="לדוגמה: 3000">
       </div>
+      <div class="field full" style="display:flex; align-items:center; gap:8px; padding-top:2px;">
+        <input type="checkbox" id="f_exempt" style="width:18px; height:18px; cursor:pointer; flex:none;">
+        <label for="f_exempt" style="margin:0; font-weight:600; cursor:pointer;">🧾 עוסק פטור — הזמנה זו ללא מע״מ</label>
+      </div>
       <div class="total-box">
         <div class="line"><span>סכום המוצרים (לפני מע״מ)</span><span id="sumProducts">₪0</span></div>
         <div class="line"><span id="sumVatLabel">מע״מ</span><span id="sumVat">₪0</span></div>
@@ -1127,6 +1131,10 @@
           <div class="field">
             <label>שיעור מע״מ (%)</label>
             <input type="number" id="q_vat" min="0" max="100" step="0.1">
+          </div>
+          <div class="field full" style="display:flex; align-items:center; gap:8px; padding-top:2px;">
+            <input type="checkbox" id="q_exempt" style="width:18px; height:18px; cursor:pointer; flex:none;">
+            <label for="q_exempt" style="margin:0; font-weight:600; cursor:pointer;">🧾 עוסק פטור — הצעה זו ללא מע״מ</label>
           </div>
           <div class="field">
             <label>🎯 סה״כ רצוי (כולל מע״מ)</label>
@@ -1444,9 +1452,11 @@ const SHIPPING_DEFAULT = 50;
 
 function orderShipping(o) { return Number(o.shippingCost) || 0; }   /* כולל מע״מ */
 function orderProducts(o) { return Number(o.amount) || 0; }         /* המחיר הסופי שהלקוח משלם, כולל מע״מ */
+/* עוסק פטור — להזמנה הזו אין מע״מ בכלל, בלי קשר לשיעור הגלובלי */
+function orderRate(o) { return o.exempt ? 0 : VAT_RATE; }
 /* סכום ביניים — המוצרים בלבד, לפני מע״מ (מחולץ מהסכום הסופי) */
 function orderSubtotal(o) { return orderProducts(o) - orderVat(o); }
-function orderVat(o) { return orderProducts(o) * VAT_RATE / (100 + VAT_RATE); }
+function orderVat(o) { const r = orderRate(o); return orderProducts(o) * r / (100 + r); }
 /* סה״כ לתשלום — `amount` כבר כולל את המע״מ, כמו דמי המשלוח, אז אין
    להוסיף מע״מ בשנית. זהו הסכום שהלקוח משלם בפועל, ולפיו נבדק גם
    הסף של מספר ההקצאה. */
@@ -1675,7 +1685,7 @@ function renderTable() {
         </td>
         <td data-label="סה״כ" class="amount">
           ${fmtCurrency(orderTotal(o))}
-          <div class="sub" style="font-weight:400;">מוצרים ${fmtCurrency(orderSubtotal(o))}${VAT_RATE > 0 ? ` + מע״מ ${fmtCurrency(orderVat(o))}` : ''}${orderShipping(o) > 0 ? ` + משלוח ${fmtCurrency(orderShipping(o))}` : ''}</div>
+          <div class="sub" style="font-weight:400;">מוצרים ${fmtCurrency(orderSubtotal(o))}${o.exempt ? ' · עוסק פטור' : orderVat(o) > 0 ? ` + מע״מ ${fmtCurrency(orderVat(o))}` : ''}${orderShipping(o) > 0 ? ` + משלוח ${fmtCurrency(orderShipping(o))}` : ''}</div>
           ${needsAllocation(o) ? (o.allocationNumber
             ? `<div class="sub" style="font-weight:600; color:var(--muted);">הקצאה: ${escapeHtml(o.allocationNumber)}</div>`
             : `<button class="sub alloc-link" onclick="openAllocation('${o.id}')">⚠️ חסר מס׳ הקצאה — הפק</button>`) : ''}
@@ -1783,6 +1793,7 @@ function openModal(id) {
      אינו משפיע על המחיר ליחידה */
   document.getElementById('f_target').value = order
     ? Math.round(orderProducts(order) * 100) / 100 : '';
+  document.getElementById('f_exempt').checked = order?.exempt || false;
   document.getElementById('f_allocation').value = order?.allocationNumber || '';
   toggleAllocationField();
   document.getElementById('f_payment').value = order?.payment || 'לא שולם';
@@ -1817,28 +1828,32 @@ function persistAllocThreshold(v) {
 }
 let ALLOCATION_THRESHOLD = loadAllocThreshold();
 
-/* סכום העסקה לפני מע״מ: גם המוצרים וגם המשלוח מנוקים מהמע״מ שכלול בהם */
+/* סכום העסקה לפני מע״מ: גם המוצרים וגם המשלוח מנוקים מהמע״מ שכלול בהם
+   (עוסק פטור: אין מע״מ לנקות, הסכום המלא נחשב "לפני מע״מ") */
 function orderPreVat(o) {
-  return orderSubtotal(o) + orderShipping(o) / (1 + VAT_RATE / 100);
+  return orderSubtotal(o) + orderShipping(o) / (1 + orderRate(o) / 100);
 }
 function needsAllocation(o) { return orderPreVat(o) > ALLOCATION_THRESHOLD; }
 
 /* קורא את סכומי הטופס. המוצרים כפי שנרשמים — המחיר הסופי כולל מע״מ,
-   בדיוק כמו המשלוח. */
+   בדיוק כמו המשלוח. עוסק פטור מאפס את השיעור להזמנה הזו בלבד. */
 function formTotals() {
   const products = Number(document.getElementById('f_amount').value) || 0;
   const shipping = Number(document.getElementById('f_shipping').value) || 0;
-  const vat = products * VAT_RATE / (100 + VAT_RATE);
-  const preVat = (products - vat) + shipping / (1 + VAT_RATE / 100);
-  return { products, shipping, vat, preVat, productsWithVat: products, grand: products + shipping };
+  const exempt = document.getElementById('f_exempt').checked;
+  const rate = exempt ? 0 : VAT_RATE;
+  const vat = products * rate / (100 + rate);
+  const preVat = (products - vat) + shipping / (1 + rate / 100);
+  return { products, shipping, vat, preVat, exempt, productsWithVat: products, grand: products + shipping };
 }
 
 /* מרענן את תיבת הסיכום ומחליט אם צריך מספר הקצאה.
    הסף נבדק לפי הסה״כ *כולל מע״מ* — זו הדרישה של רשות המסים. */
 function toggleAllocationField() {
-  const { products, shipping, vat, preVat, grand } = formTotals();
+  const { products, shipping, vat, preVat, grand, exempt } = formTotals();
   document.getElementById('sumProducts').textContent = fmtCurrency(products - vat);
-  document.getElementById('sumVatLabel').textContent = `מע״מ ${VAT_RATE.toLocaleString('he-IL')}%`;
+  document.getElementById('sumVatLabel').textContent = exempt
+    ? 'מע״מ — עוסק פטור' : `מע״מ ${VAT_RATE.toLocaleString('he-IL')}%`;
   document.getElementById('sumVat').textContent = fmtCurrency(vat);
   document.getElementById('sumShipping').textContent = fmtCurrency(shipping);
   document.getElementById('sumGrand').textContent = fmtCurrency(grand);
@@ -1849,6 +1864,7 @@ function toggleAllocationField() {
 }
 document.getElementById('f_amount').addEventListener('input', toggleAllocationField);
 document.getElementById('f_shipping').addEventListener('input', toggleAllocationField);
+document.getElementById('f_exempt').addEventListener('change', toggleAllocationField);
 
 function toggleCheckFields() {
   const isCheck = document.getElementById('f_payment').value === 'צק';
@@ -1911,7 +1927,7 @@ document.getElementById('saveOrder').addEventListener('click', () => {
   const name = document.getElementById('f_name').value.trim();
   if (!name) { showToast('נא להזין שם לקוח'); document.getElementById('f_name').focus(); return; }
 
-  const { products: amountVal, shipping: shippingVal, preVat: preVatVal } = formTotals();
+  const { products: amountVal, shipping: shippingVal, preVat: preVatVal, exempt: exemptVal } = formTotals();
   const allocationNumber = document.getElementById('f_allocation').value.trim();
   if (preVatVal > ALLOCATION_THRESHOLD && !allocationNumber) {
     showToast(`סכום העסקה לפני מע״מ מעל ${ALLOCATION_THRESHOLD.toLocaleString('he-IL')} ₪ — חובה להזין מספר הקצאה`);
@@ -1928,6 +1944,7 @@ document.getElementById('saveOrder').addEventListener('click', () => {
     unitPrice: document.getElementById('f_unit_price').value ? Number(document.getElementById('f_unit_price').value) : '',
     amount: amountVal,
     shippingCost: shippingVal,
+    exempt: exemptVal,
     allocationNumber,
     payment: document.getElementById('f_payment').value,
     checkDueDate: document.getElementById('f_check_due_date').value,
@@ -2191,9 +2208,9 @@ function sanitizeCell(v) {
   return /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
 }
 document.getElementById('exportBtn').addEventListener('click', () => {
-  const headers = ['שם הלקוח','טלפון','כתובת','אימייל','כמות','מחיר ליחידה','סכום לתשלום','דמי משלוח','סכום ביניים (לפני מע״מ)',`מע״מ ${VAT_RATE}%`,'סה״כ לתשלום','מספר הקצאה','שיטת תשלום(מזומן/העברה/צק/לא שולם)','תאריך פרעון הצ׳ק','פרטי הצ׳ק','סטטוס משלוח (נשלח/לא נשלח)','תאריך משלוח','תאריך תזכורת ','הערות','שלב'];
+  const headers = ['שם הלקוח','טלפון','כתובת','אימייל','כמות','מחיר ליחידה','סכום לתשלום','דמי משלוח','עוסק פטור (ללא מע״מ)','סכום ביניים (לפני מע״מ)',`מע״מ ${VAT_RATE}%`,'סה״כ לתשלום','מספר הקצאה','שיטת תשלום(מזומן/העברה/צק/לא שולם)','תאריך פרעון הצ׳ק','פרטי הצ׳ק','סטטוס משלוח (נשלח/לא נשלח)','תאריך משלוח','תאריך תזכורת ','הערות','שלב'];
   const rows = orders.map(o => [
-    o.name, o.phone, o.address, o.email, o.qty, o.unitPrice, o.amount, orderShipping(o),
+    o.name, o.phone, o.address, o.email, o.qty, o.unitPrice, o.amount, orderShipping(o), o.exempt ? 'כן' : '',
     orderSubtotal(o), Math.round(orderVat(o) * 100) / 100, Math.round(orderTotal(o) * 100) / 100,
     o.allocationNumber, o.payment, o.checkDueDate, o.checkDetails, o.deliveryStatus, o.deliveryDate, o.reminderDate, o.notes, STAGE_LABEL[orderStage(o)]
   ].map(sanitizeCell));
@@ -2225,6 +2242,7 @@ document.getElementById('importInput').addEventListener('change', (e) => {
         unitPrice: r['מחיר ליחידה'] || '',
         amount: r['סכום לתשלום'] || 0,
         shippingCost: r['דמי משלוח'] || 0,
+        exempt: ['כן', 'TRUE', 'true', true, 1, '1'].includes(r['עוסק פטור (ללא מע״מ)']),
         allocationNumber: r['מספר הקצאה'] || '',
         payment: r['שיטת תשלום(מזומן/העברה/צק/לא שולם)'] || 'לא שולם',
         checkDueDate: toISODate(r['תאריך פרעון הצ׳ק']),
@@ -2394,6 +2412,7 @@ const HEADER_MAP = {
   'תאריך משלוח': 'deliveryDate',
   'תאריך תזכורת ': 'reminderDate',
   'הערות': 'notes',
+  'עוסק פטור': 'exempt',
 };
 const SHEET_HEADERS = Object.keys(HEADER_MAP);
 
@@ -2464,6 +2483,7 @@ async function loadFromSheet(silent) {
           let v = r[heb];
           if ((key === 'deliveryDate' || key === 'reminderDate' || key === 'checkDueDate') && v) v = toISODate(v);
           else if (key === 'qty' || key === 'amount' || key === 'unitPrice' || key === 'shippingCost') v = v === '' || v == null ? '' : Number(v) || 0;
+          else if (key === 'exempt') v = v === true || v === 'TRUE' || v === 'כן' || v === 1 || v === '1';
           else v = v == null ? '' : v;
           o[key] = v;
         }
@@ -2920,6 +2940,12 @@ const QUOTE_FIELDS = {
   q_note: 'note', q_contact: 'contact', q_phone: 'phone', q_footer: 'footer',
 };
 
+/* עוסק פטור בהצעת המחיר מאפס את שיעור המע״מ, בלי קשר למה שרשום בשדה % */
+function quoteVatRate() {
+  return document.getElementById('q_exempt').checked
+    ? 0 : (Number(document.getElementById('q_vat').value) || 0);
+}
+
 function readQuoteForm() {
   const v = {};
   for (const id of Object.keys(QUOTE_FIELDS)) v[QUOTE_FIELDS[id]] = document.getElementById(id).value;
@@ -2951,7 +2977,7 @@ function renderQuote() {
   const unit = Number(v.unit) || 0;
   const amount = Number(v.amount) || 0;
   const ship = Number(v.ship) || 0;
-  const rate = (Number(v.vat) || 0) / 100;
+  const rate = quoteVatRate() / 100;
 
   /* סכום המוצרים לפני מע״מ; המשלוח פריט נפרד שכבר כולל מע״מ
      ולכן אינו נכנס לבסיס החישוב */
@@ -3043,6 +3069,7 @@ function openQuote(orderId) {
   document.getElementById('q_ship').value = o ? orderShipping(o) : '';
   document.getElementById('q_target').value = o
     ? Math.round(orderProducts(o) * 100) / 100 : '';
+  document.getElementById('q_exempt').checked = o ? !!o.exempt : false;
   document.getElementById('q_vat').value = p.vat;
   document.getElementById('q_note').value = p.note;
   document.getElementById('q_contact').value = p.contact;
@@ -3092,7 +3119,7 @@ Object.keys(QUOTE_FIELDS).forEach(id => {
 function backCalcQuote() {
   const target = Number(document.getElementById('q_target').value) || 0;
   if (target <= 0) return false;
-  const rate = (Number(document.getElementById('q_vat').value) || 0) / 100;
+  const rate = quoteVatRate() / 100;
   /* המשלוח אינו נכנס לחישוב — הוא פריט נפרד שכבר כולל מע״מ */
   const products = target / (1 + rate);
   document.getElementById('q_amount').value = Math.round(products * 10000) / 10000;
@@ -3109,6 +3136,9 @@ document.getElementById('q_qty').addEventListener('input', () => {
   if (!backCalcQuote()) recalcQuoteAmount();
 });
 document.getElementById('q_vat').addEventListener('input', () => { backCalcQuote(); });
+document.getElementById('q_exempt').addEventListener('change', () => {
+  if (!backCalcQuote()) renderQuote();
+});
 document.getElementById('q_unit').addEventListener('input', recalcQuoteAmount);
 
 document.getElementById('closeQuote').addEventListener('click', closeQuote);
@@ -3203,7 +3233,7 @@ function quoteWaText() {
   const v = readQuoteForm();
   const qty = Number(v.qty) || 0, unit = Number(v.unit) || 0;
   const amount = Number(v.amount) || 0, ship = Number(v.ship) || 0;
-  const rate = (Number(v.vat) || 0) / 100;
+  const rate = quoteVatRate() / 100;
   const subtotal = amount, vat = subtotal * rate, grand = subtotal + vat + ship;
 
   const L = ['בס"ד', ''];
@@ -3241,7 +3271,7 @@ function persistQuotesLocal() {
   try { localStorage.setItem(QUOTES_KEY, JSON.stringify(savedQuotes)); } catch (e) { /* אחסון חסום */ }
 }
 
-const QUOTE_COLS = ['id','savedAt','to','subject','item','qty','unit','amount','shipping','vat','grand',
+const QUOTE_COLS = ['id','savedAt','to','subject','item','qty','unit','amount','shipping','vat','exempt','grand',
                     'intro','product','kosher','note','contact','phone','footer'];
 
 async function loadQuotesFromSheet() {
@@ -3254,6 +3284,7 @@ async function loadQuotesFromSheet() {
         const q = {};
         QUOTE_COLS.forEach(c => { q[c] = r[c] ?? ''; });
         ['qty','unit','amount','shipping','vat','grand'].forEach(k => { q[k] = Number(q[k]) || 0; });
+        q.exempt = q.exempt === true || q.exempt === 'TRUE' || q.exempt === 'כן' || q.exempt === 1 || q.exempt === '1';
         return q;
       });
       persistQuotesLocal();
@@ -3277,14 +3308,15 @@ async function saveQuotesToSheet() {
 function snapshotQuote() {
   const v = readQuoteForm();
   const amount = Number(v.amount) || 0, ship = Number(v.ship) || 0;
-  const rate = (Number(v.vat) || 0) / 100;
+  const exempt = document.getElementById('q_exempt').checked;
+  const rate = quoteVatRate() / 100;
   const vat = amount * rate;
   return {
     id: 'q_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     savedAt: new Date().toISOString(),
     to: v.to || '', subject: v.subject || '', item: v.item || '',
     qty: Number(v.qty) || 0, unit: Number(v.unit) || 0,
-    amount, shipping: ship, vat, grand: amount + vat + ship,
+    amount, shipping: ship, vat, exempt, grand: amount + vat + ship,
     intro: v.intro || '', product: v.product || '', kosher: v.kosher || '',
     note: v.note || '', contact: v.contact || '', phone: v.phone || '', footer: v.footer || '',
   };
@@ -3371,7 +3403,8 @@ function restoreQuote(q) {
     const el = document.getElementById(id);
     if (el) el.value = q[key] ?? '';
   });
-  /* שיעור המע״מ משוחזר מהסכומים ששמורים, לא מההגדרה הנוכחית */
+  /* שיעור המע״מ ותיבת העוסק הפטור משוחזרים מהסכומים ששמורים, לא מההגדרה הנוכחית */
+  document.getElementById('q_exempt').checked = !!q.exempt;
   const rate = q.amount ? Math.round((q.vat / q.amount) * 1000) / 10 : VAT_RATE;
   document.getElementById('q_vat').value = rate;
   document.getElementById('q_target').value = Math.round((q.amount + q.vat) * 100) / 100;
@@ -3411,6 +3444,7 @@ async function approveQuote(q) {
     unitPrice: (Number(q.qty) > 0) ? Math.round((grossAmount / Number(q.qty)) * 100) / 100 : (q.unit || ''),
     amount: grossAmount,
     shippingCost: q.shipping || 0,
+    exempt: !!q.exempt,
     allocationNumber: '',
     payment: 'לא שולם',
     checkDueDate: '', checkDetails: '',
