@@ -2652,14 +2652,16 @@ function monthLabel(key) {
     .toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
 }
 
-/* מקבץ הזמנות לפי מפתח ומחזיר רשימה ממוינת של {key, count, sum} */
-function groupBy(list, keyFn) {
+/* מקבץ הזמנות לפי מפתח ומחזיר רשימה ממוינת של {key, count, sum}.
+   valueFn קובע מה מסכמים לכל הזמנה — ברירת המחדל היא הסה״כ כולל מע״מ. */
+function groupBy(list, keyFn, valueFn) {
+  valueFn = valueFn || orderTotal;
   const map = new Map();
   list.forEach(o => {
     const k = keyFn(o);
     if (k === '' || k == null) return;
     const cur = map.get(k) || { key: k, count: 0, sum: 0 };
-    cur.count++; cur.sum += orderTotal(o);
+    cur.count++; cur.sum += valueFn(o);
     map.set(k, cur);
   });
   return [...map.values()].sort((a, b) => b.sum - a.sum);
@@ -2719,6 +2721,10 @@ function renderReports() {
   const byCustomer = groupBy(orders, o => (o.name || '').trim()).slice(0, 6);
   const byMonth = groupBy(orders, o => monthKey(o.deliveryDate))
     .sort((a, b) => b.key.localeCompare(a.key)).slice(0, 6);
+  /* מע״מ לתשלום לפי חודש — אותו חיתוך חודשי כמו "הכנסות לפי חודש",
+     רק שמסכמים את חלק המע״מ (orderVat) במקום הסה״כ */
+  const vatByMonth = groupBy(orders, o => monthKey(o.deliveryDate), orderVat)
+    .sort((a, b) => b.key.localeCompare(a.key)).slice(0, 6);
   const noDates = orders.filter(o => !monthKey(o.deliveryDate)).length;
 
   document.getElementById('reportsBody').innerHTML = `
@@ -2767,6 +2773,12 @@ function renderReports() {
     </div>
 
     <div class="rep-section">
+      <h3>מע״מ לתשלום לפי חודש <span class="sub" style="font-weight:400;">(${VAT_RATE.toLocaleString('he-IL')}% · לפי תאריך משלוח)</span></h3>
+      ${barRows(vatByMonth, 'var(--warning)', monthLabel)}
+      ${noDates ? `<div class="rep-empty">${noDates} הזמנות ללא תאריך משלוח אינן נכללות כאן</div>` : ''}
+    </div>
+
+    <div class="rep-section">
       <h3>לקוחות מובילים</h3>
       ${barRows(byCustomer, 'var(--brand)')}
     </div>
@@ -2803,6 +2815,11 @@ document.getElementById('exportReportBtn').addEventListener('click', () => {
     ['סכום החודש', d.monthSum],
     ['משלוחים באיחור', d.overdueCount],
     ['צ׳קים לפרעון השבוע', d.checksDueCount],
+    [],
+    [`מע״מ לתשלום לפי חודש (${VAT_RATE}%, לפי תאריך משלוח)`, 'מספר הזמנות', 'מע״מ'],
+    ...groupBy(orders, o => monthKey(o.deliveryDate), orderVat)
+      .sort((a, b) => b.key.localeCompare(a.key))
+      .map(c => [monthLabel(c.key), c.count, Math.round(c.sum * 100) / 100]),
     [],
     ['לקוח', 'מספר הזמנות', 'סה״כ'],
     ...groupBy(orders, o => (o.name || '').trim()).map(c => [c.key, c.count, c.sum]),
