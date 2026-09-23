@@ -3017,11 +3017,15 @@ function openQuote(orderId) {
   document.getElementById('q_type').value = p.type;
   document.getElementById('q_item').value = p.item;
   document.getElementById('q_qty').value = o ? (o.qty ?? '') : '';
-  document.getElementById('q_unit').value = o ? (o.unitPrice ?? '') : '';
-  document.getElementById('q_amount').value = o ? orderProducts(o) : '';
+  /* בהזמנה `amount`/`unitPrice` הם כולל מע״מ; בהצעת מחיר q_amount/q_unit
+     הם לפני מע״מ — לכן ממירים כשממלאים הצעה מתוך הזמנה קיימת. */
+  document.getElementById('q_unit').value = (o && Number(o.qty) > 0)
+    ? Math.round((orderSubtotal(o) / Number(o.qty)) * 100) / 100
+    : (o ? (o.unitPrice ?? '') : '');
+  document.getElementById('q_amount').value = o ? Math.round(orderSubtotal(o) * 100) / 100 : '';
   document.getElementById('q_ship').value = o ? orderShipping(o) : '';
   document.getElementById('q_target').value = o
-    ? Math.round((orderProducts(o) + orderVat(o)) * 100) / 100 : '';
+    ? Math.round(orderProducts(o) * 100) / 100 : '';
   document.getElementById('q_vat').value = p.vat;
   document.getElementById('q_note').value = p.note;
   document.getElementById('q_contact').value = p.contact;
@@ -3361,12 +3365,14 @@ function restoreQuote(q) {
   setTimeout(fitQuotePreview, 60);
 }
 
-/* הצעה שאושרה הופכת להזמנה. הסכומים עוברים כפי שהם:
-   `amount` לפני מע״מ ו-`shippingCost` כולל מע״מ — בדיוק המודל של ההזמנה. */
+/* הצעה שאושרה הופכת להזמנה. בהצעה `amount` הוא לפני מע״מ ו-`vat` נפרד;
+   בהזמנה `amount` הוא תמיד המחיר הסופי כולל מע״מ (כמו `shippingCost`) —
+   לכן מאחדים אותם ל-grossAmount לפני ההשוואה/היצירה. */
 async function approveQuote(q) {
+  const grossAmount = (Number(q.amount) || 0) + (Number(q.vat) || 0);
   const existing = orders.find(o =>
     String(o.name || '').trim().toLowerCase() === String(q.to || '').trim().toLowerCase() &&
-    Math.abs(orderProducts(o) - q.amount) < 0.01);
+    Math.abs(orderProducts(o) - grossAmount) < 0.01);
 
   const ok = await askConfirm({
     title: '✔️ ההצעה אושרה',
@@ -3385,8 +3391,8 @@ async function approveQuote(q) {
     name: q.to || '',
     phone: '', email: '', address: '',
     qty: q.qty || '',
-    unitPrice: q.unit || '',
-    amount: q.amount || 0,
+    unitPrice: (Number(q.qty) > 0) ? Math.round((grossAmount / Number(q.qty)) * 100) / 100 : (q.unit || ''),
+    amount: grossAmount,
     shippingCost: q.shipping || 0,
     allocationNumber: '',
     payment: 'לא שולם',
