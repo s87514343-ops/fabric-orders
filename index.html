@@ -1443,13 +1443,14 @@ let VAT_RATE = loadVatRate();
 const SHIPPING_DEFAULT = 50;
 
 function orderShipping(o) { return Number(o.shippingCost) || 0; }   /* כולל מע״מ */
-function orderProducts(o) { return Number(o.amount) || 0; }         /* לפני מע״מ */
-/* סכום ביניים — המוצרים בלבד, לפני מע״מ */
-function orderSubtotal(o) { return orderProducts(o); }
-function orderVat(o) { return orderProducts(o) * (VAT_RATE / 100); }
-/* סה״כ לתשלום — מוצרים + מע״מ עליהם + משלוח. זהו הסכום שהלקוח
-   משלם בפועל, ולפיו נבדק גם הסף של מספר ההקצאה. */
-function orderTotal(o) { return orderProducts(o) + orderVat(o) + orderShipping(o); }
+function orderProducts(o) { return Number(o.amount) || 0; }         /* המחיר הסופי שהלקוח משלם, כולל מע״מ */
+/* סכום ביניים — המוצרים בלבד, לפני מע״מ (מחולץ מהסכום הסופי) */
+function orderSubtotal(o) { return orderProducts(o) - orderVat(o); }
+function orderVat(o) { return orderProducts(o) * VAT_RATE / (100 + VAT_RATE); }
+/* סה״כ לתשלום — `amount` כבר כולל את המע״מ, כמו דמי המשלוח, אז אין
+   להוסיף מע״מ בשנית. זהו הסכום שהלקוח משלם בפועל, ולפיו נבדק גם
+   הסף של מספר ההקצאה. */
+function orderTotal(o) { return orderProducts(o) + orderShipping(o); }
 
 /* שלב ההזמנה: לא נשלח → נשלח ולא שולם → הושלם */
 function orderStage(o) {
@@ -1674,7 +1675,7 @@ function renderTable() {
         </td>
         <td data-label="סה״כ" class="amount">
           ${fmtCurrency(orderTotal(o))}
-          <div class="sub" style="font-weight:400;">מוצרים ${fmtCurrency(orderProducts(o))}${VAT_RATE > 0 ? ` + מע״מ ${fmtCurrency(orderVat(o))}` : ''}${orderShipping(o) > 0 ? ` + משלוח ${fmtCurrency(orderShipping(o))}` : ''}</div>
+          <div class="sub" style="font-weight:400;">מוצרים ${fmtCurrency(orderSubtotal(o))}${VAT_RATE > 0 ? ` + מע״מ ${fmtCurrency(orderVat(o))}` : ''}${orderShipping(o) > 0 ? ` + משלוח ${fmtCurrency(orderShipping(o))}` : ''}</div>
           ${needsAllocation(o) ? (o.allocationNumber
             ? `<div class="sub" style="font-weight:600; color:var(--muted);">הקצאה: ${escapeHtml(o.allocationNumber)}</div>`
             : `<button class="sub alloc-link" onclick="openAllocation('${o.id}')">⚠️ חסר מס׳ הקצאה — הפק</button>`) : ''}
@@ -1781,7 +1782,7 @@ function openModal(id) {
   /* היעד הוא סכום המוצרים כולל מע״מ, בלי המשלוח — כך שהמשלוח
      אינו משפיע על המחיר ליחידה */
   document.getElementById('f_target').value = order
-    ? Math.round((orderProducts(order) + orderVat(order)) * 100) / 100 : '';
+    ? Math.round(orderProducts(order) * 100) / 100 : '';
   document.getElementById('f_allocation').value = order?.allocationNumber || '';
   toggleAllocationField();
   document.getElementById('f_payment').value = order?.payment || 'לא שולם';
@@ -1816,26 +1817,27 @@ function persistAllocThreshold(v) {
 }
 let ALLOCATION_THRESHOLD = loadAllocThreshold();
 
-/* סכום העסקה לפני מע״מ: המוצרים כפי שהם, והמשלוח מנוקה מהמע״מ שכלול בו */
+/* סכום העסקה לפני מע״מ: גם המוצרים וגם המשלוח מנוקים מהמע״מ שכלול בהם */
 function orderPreVat(o) {
-  return orderProducts(o) + orderShipping(o) / (1 + VAT_RATE / 100);
+  return orderSubtotal(o) + orderShipping(o) / (1 + VAT_RATE / 100);
 }
 function needsAllocation(o) { return orderPreVat(o) > ALLOCATION_THRESHOLD; }
 
-/* קורא את סכומי הטופס. המוצרים לפני מע״מ, המשלוח כולל מע״מ. */
+/* קורא את סכומי הטופס. המוצרים כפי שנרשמים — המחיר הסופי כולל מע״מ,
+   בדיוק כמו המשלוח. */
 function formTotals() {
   const products = Number(document.getElementById('f_amount').value) || 0;
   const shipping = Number(document.getElementById('f_shipping').value) || 0;
-  const vat = products * (VAT_RATE / 100);
-  const preVat = products + shipping / (1 + VAT_RATE / 100);
-  return { products, shipping, vat, preVat, productsWithVat: products + vat, grand: products + vat + shipping };
+  const vat = products * VAT_RATE / (100 + VAT_RATE);
+  const preVat = (products - vat) + shipping / (1 + VAT_RATE / 100);
+  return { products, shipping, vat, preVat, productsWithVat: products, grand: products + shipping };
 }
 
 /* מרענן את תיבת הסיכום ומחליט אם צריך מספר הקצאה.
    הסף נבדק לפי הסה״כ *כולל מע״מ* — זו הדרישה של רשות המסים. */
 function toggleAllocationField() {
   const { products, shipping, vat, preVat, grand } = formTotals();
-  document.getElementById('sumProducts').textContent = fmtCurrency(products);
+  document.getElementById('sumProducts').textContent = fmtCurrency(products - vat);
   document.getElementById('sumVatLabel').textContent = `מע״מ ${VAT_RATE.toLocaleString('he-IL')}%`;
   document.getElementById('sumVat').textContent = fmtCurrency(vat);
   document.getElementById('sumShipping').textContent = fmtCurrency(shipping);
@@ -1864,16 +1866,15 @@ function recalcAmountFromUnits() {
   }
 }
 
-/* חישוב לאחור: מסכום המוצרים הרצוי (כולל מע״מ) אל הסכום לפני מע״מ
-   ואל המחיר ליחידה.
+/* חישוב לאחור: מסכום המוצרים הרצוי (כולל מע״מ) אל המחיר ליחידה.
+   `f_amount` כבר מייצג סכום כולל מע״מ, בדיוק כמו היעד — אז הוא
+   מקבל את היעד כמו שהוא, בלי לחלץ ממנו את המע״מ.
    דמי המשלוח אינם נכנסים לחישוב — הם פריט נפרד שכבר כולל מע״מ,
    ולכן אינם משפיעים על המחיר ליחידה. */
 function backCalcFromTarget() {
   const target = Number(document.getElementById('f_target').value) || 0;
   if (target <= 0) return false;
-  /* ארבע ספרות ולא שתיים: עיגול לאגורות כאן מחזיר שארית שמתגלגלת
-     למע״מ ומקפיצה את הסה״כ באגורה (6,000 → 6,000.01). */
-  const products = target / (1 + VAT_RATE / 100);
+  const products = target;
   document.getElementById('f_amount').value = Math.round(products * 10000) / 10000;
   const qty = Number(document.getElementById('f_qty').value) || 0;
   if (qty > 0) {
